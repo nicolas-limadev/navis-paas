@@ -1,124 +1,169 @@
 # NavisPaaS 🚢⚡
 
 > **Developer-Centric Kubernetes PaaS Engine**  
-> Deploy microservices effortlessly and attach pre-integrated infrastructure offers (Kafka, Prometheus & Grafana Monitoring, Redis, Postgres) with automatic service bindings and zero boilerplate.
+> Plataforma PaaS simplificada para Kubernetes focada na experiência do desenvolvedor: faça deploy de microsserviços em namespaces dedicados e vincule ofertas de infraestrutura pré-integradas (Apache Kafka, Observabilidade Prometheus/Grafana/OTel, PostgreSQL, Redis) com injeção automática de configurações e zero boilerplate de YAMLs.
 
 ---
 
-## 🌟 Visão Geral
+## 🌟 Visão Geral e Arquitetura
 
-O **NavisPaaS** foi concebido para resolver o atrito entre o desenvolvedor e a complexidade do Kubernetes. 
+O **NavisPaaS** remove a barreira de complexidade do Kubernetes para desenvolvedores. 
 
-Em vez de criar dezenas de manifestos YAML (`Deployment`, `Service`, `ConfigMap`, `ServiceMonitor`, `KafkaTopic`), o desenvolvedor informa sua imagem e porta, seleciona as **ofertas** desejadas e a plataforma cuida do provisionamento e da injeção das configurações via variáveis de ambiente e annotations.
+Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service`, `ConfigMap`, `Secret`, `ServiceMonitor`, `KafkaTopic`), o desenvolvedor apenas informa a imagem e a porta da aplicação, marca as **ofertas** desejadas e a plataforma cuida do provisionamento, isolamento e injeção de variáveis de ambiente.
 
 ```
 ┌────────────────────────────────────────────────────────┐
 │                   Spotify Backstage                    │
 │            (Developer Portal / Scaffolder)             │
-│   - Catálogo de Serviços                               │
-│   - Templates Self-Service com 1 clique                │
+│   - Catálogo de Serviços & APIs                        │
+│   - Template Self-Service com 1 clique (`make backstage│
 └──────────────────────────┬─────────────────────────────┘
                            │ REST API / OpenAPI 3.0
 ┌──────────────────────────▼─────────────────────────────┐
 │                 NavisPaaS Core Engine                  │
 │                     (Backend em Go)                    │
-│  - REST API (Gin + OpenAPI Spec)                       │
-│  - Web Dashboard SPA (Dark Mode)                       │
+│  - REST API (Gin + OpenAPI Spec / Swagger)             │
+│  - Web Dashboard SPA Nativo (Dark Mode)                │
 │  - Catalog & Service Binding Engine                    │
+│  - Docker Registry Manager (imagePullSecrets)          │
 └──────────────────────────┬─────────────────────────────┘
                            │ client-go / Kube API
 ┌──────────────────────────▼─────────────────────────────┐
 │                   Cluster Minikube                     │
-│  • Workloads dos Devs (navis-apps)                     │
-│  • Oferta Kafka: Apache Kafka (namespace: kafka)       │
+│  • Workload Isolado por App (ex: namespace `app-name`) │
+│  • Serviços Type: LoadBalancer (Acesso via `tunnel`)   │
+│  • Oferta Kafka: Apache Kafka (namespace: `kafka`)     │
 │  • Oferta Observability: Prometheus + Grafana (30080)  │
+│  • Oferta Dados: PostgreSQL e Redis (namespace: `data`)│
 └────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 🧩 Ofertas Pré-Integradas (Addons)
+## ✨ Principais Funcionalidades
 
-| Oferta | Categoria | O que o NavisPaaS faz ao linkar |
-| :--- | :--- | :--- |
-| **Apache Kafka** | *Messaging* | Provisiona o tópico, cria ConfigMap de binding e injeta `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `KAFKA_CONSUMER_GROUP` e `KAFKA_CLIENT_ID` no pod. |
-| **Observability Stack** | *Observability* | Configura o Prometheus para raspar o endpoint `/metrics`, injeta endpoints do OpenTelemetry Collector e disponibiliza o dashboard no Grafana (`:30080`). |
-| **Redis Cache** | *Database* | Provisiona instância Redis e injeta `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`. |
-| **PostgreSQL DB** | *Database* | Provisiona instância PostgreSQL e injeta `DB_HOST`, `DB_PORT`, `DATABASE_URL`. |
+* 📁 **Namespace Dedicado por Aplicação**: Cada aplicação ganha seu próprio namespace isolado (ex: `football-mm`), garantindo isolamento total de Secrets, ConfigMaps, RBAC e cotas. Ao deletar o app, o namespace é limpo por completo sem deixar resíduos no cluster.
+* ⚡ **Acesso Direto com Minikube Tunnel**: Os serviços são criados como `Type: LoadBalancer`. Com o comando `make tunnel`, a aplicação ganha um IP externo roteável diretamente na sua máquina host (além de manter fallback via NodePort).
+* 🧩 **Catálogo de Ofertas Pré-Integradas (Addons)**:
+  * **Apache Kafka**: Provisionamento de broker KRaft, tópico e injeção de `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `KAFKA_CONSUMER_GROUP`, `KAFKA_CLIENT_ID`.
+  * **Observabilidade (Prometheus + Grafana + OTel)**: Scraping automático de métricas (`prometheus.io/scrape`), injeção de endpoints do OpenTelemetry Collector e dashboards pré-configurados no Grafana (`:30080`).
+  * **PostgreSQL Relational DB**: Instância PostgreSQL com injeção automática de variáveis padrão de mercado (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_URL` e aliases `DB_*` e `POSTGRES_*`), compatível diretamente com TypeORM, NestJS, Prisma, Spring Boot e Django.
+  * **Redis Cache**: In-memory data store com injeção de `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`.
+* 🐳 **Suporte a Docker Registry (Público, Privado e Minikube Local)**:
+  * **Docker Hub**: Padrão nativo (`docker.io`) para imagens públicas.
+  * **Registries Privados (GHCR, Harbor, ECR, GitLab)**: Gerenciamento de credenciais via UI/API com criação automática de Secret `kubernetes.io/dockerconfigjson` e injeção de `imagePullSecrets`.
+  * **Minikube Local**: Configurado com `imagePullPolicy: IfNotPresent`. Para usar imagens locais sem fazer push, basta rodar `eval $(minikube docker-env)` antes do build.
+* 🎭 **Integração Nativa com Spotify Backstage**: Inicie o portal com o comando `make backstage` com catálogo e templates do Scaffolder já pré-configurados.
 
 ---
 
 ## 🚀 Como Executar
 
-### 1. Iniciar o Minikube
+### 1. Pré-requisitos
+* Go >= 1.24
+* Minikube & Kubectl instalados
+* Docker
+
+### 2. Iniciar o Cluster Minikube
 ```bash
-minikube start --driver=docker --cpus=2 --memory=4096
+make minikube-start
 ```
 
-### 2. Compilar e Rodar o NavisPaaS
+### 3. Compilar e Rodar o NavisPaaS
 ```bash
-cd /home/nicolas/projects-github/navispaas
 make run
 ```
 
-Acesse o **Dashboard Web**:
-👉 **http://localhost:8080**
-
-Documentação OpenAPI:
-👉 **http://localhost:8080/api/v1/openapi.json**
+Acesse:
+* 🌐 **Dashboard Web**: [http://localhost:8080](http://localhost:8080)
+* 📚 **OpenAPI 3.0 Spec**: [http://localhost:8080/api/v1/openapi.json](http://localhost:8080/api/v1/openapi.json)
 
 ---
 
-## 🎭 Integração com Spotify Backstage
+## 🛠️ Comandos do Makefile
 
-O NavisPaaS foi desenhado para ser acoplado diretamente ao Backstage:
-
-1. **Catálogo de Componentes**: O arquivo `backstage/catalog-info.yaml` registra a API e o serviço do NavisPaaS no catálogo do Backstage.
-2. **Software Template (Scaffolder)**: O arquivo `backstage/template-app.yaml` define o formulário no Backstage para os devs criarem novas aplicações escolhendo as caixas de seleção do **Kafka** e da **Monitoração**.
-
----
-
-## 🐳 Suporte a Docker Registry (Público, Privado e Minikube Local)
-
-O **NavisPaaS** gerencia automaticamente a resolução e o download de imagens:
-
-1. **Registries Privados (GHCR, Docker Hub, ECR, Harbor)**:
-   * Configure suas credenciais via Dashboard (botão `🔐 Registry`) ou via API `POST /api/v1/registry`.
-   * O NavisPaaS cria automaticamente o Secret do tipo `kubernetes.io/dockerconfigjson` (`navis-registry-secret`) e injeta o `imagePullSecrets` em todos os pods.
-
-2. **Prefixo Padrão (Default Prefix)**:
-   * Ao configurar um prefixo (ex: `ghcr.io/minha-empresa`), o desenvolvedor pode informar apenas `order-service:v1.0` que o NavisPaaS expande para `ghcr.io/minha-empresa/order-service:v1.0`.
-
-3. **Minikube Local (Sem push remoto)**:
-   * Basta apontar o terminal local para o daemon do Minikube antes de gerar o build:
-     ```bash
-     eval $(minikube docker-env)
-     docker build -t minha-app:latest .
-     ```
-   * O NavisPaaS usa `imagePullPolicy: IfNotPresent`, aproveitando imediatamente a imagem local do Minikube sem erro de pull!
+| Comando | Descrição |
+| :--- | :--- |
+| `make build` | Compila o binário otimizado em `bin/navispaas` |
+| `make run` | Compila e inicia o servidor do NavisPaaS na porta 8080 |
+| `make tunnel` | Inicia o **Minikube Tunnel** para atribuir IPs externos roteáveis às aplicações |
+| `make backstage` | Inicializa o **Spotify Backstage** com os templates do NavisPaaS já plugados |
+| `make test` | Executa a suíte de testes unitários com flags verbosas |
+| `make minikube-start` | Inicia o Minikube local com perfil recomendado (2 CPUs, 4GB RAM) |
+| `make clean` | Remove os binários gerados na pasta `bin/` |
 
 ---
 
-## 📡 Referência Rápida da API REST
+## 🌐 Como Acessar suas Aplicações no Minikube
+
+Para acessar os microsserviços após o deploy:
+
+### Método 1: Minikube Tunnel (Recomendado)
+Em um terminal separado, execute:
+```bash
+make tunnel
+```
+O Minikube cria uma rota direta na sua máquina. O Dashboard do NavisPaaS detecta o túnel e exibe o link **"Live URL"** direto no card da aplicação (ex: `http://10.96.x.x:3000`).
+
+### Método 2: IP do Minikube + NodePort
+Se não estiver usando o túnel, o NavisPaaS também aloca uma porta NodePort automaticamente:
+* Descubra o IP do Minikube: `minikube ip` (ex: `192.168.49.2`)
+* Acesse via: `http://<MINIKUBE_IP>:<NODE_PORT>/` (ex: `http://192.168.49.2:32215/docs/`)
+
+### Método 3: Atalho Automático do Minikube
+```bash
+minikube service <nome-da-app> -n <nome-da-app>
+```
+
+> 💡 **Dica sobre a Porta do Container:** Certifique-se de preencher no formulário de deploy a porta real que sua aplicação escuta (ex: porta `3000` para NestJS/Express, `8080` para Spring Boot/Go, `80` para Nginx).
+
+---
+
+## 🎭 Integração com o Spotify Backstage
+
+O NavisPaaS fornece suporte pronto para ser o motor de execução do Backstage.
+
+### Subir Automaticamente
+Basta executar:
+```bash
+make backstage
+```
+O script `scripts/start-backstage.sh` configura o Node.js v20, instala o Yarn, cria a pasta `~/projects-github/backstage-portal` (se ainda não existir) e injeta os arquivos do NavisPaaS no `app-config.yaml`. O portal abrirá em [http://localhost:3000](http://localhost:3000).
+
+### Adicionar em um Backstage Já Existente
+Se você já possui uma instância do Backstage em execução:
+1. Abra o Backstage e clique em **Create...** (ou **Catalog**).
+2. Clique no canto superior direito em **Register Existing Component**.
+3. Aponte para os arquivos do repositório:
+   * **Componente & API**: `backstage/catalog-info.yaml`
+   * **Template do Scaffolder**: `backstage/template-app.yaml`
+4. Clique em **Analyze** e depois em **Import**.
+
+---
+
+## 📡 Referência da API REST
 
 | Método | Endpoint | Descrição |
 | :--- | :--- | :--- |
-| `GET` | `/api/v1/health` | Status de conectividade com o Minikube / K8s |
-| `GET` | `/api/v1/apps` | Lista todas as aplicações gerenciadas |
-| `POST` | `/api/v1/apps` | Faz deploy de uma aplicação (com auto-link opcional de ofertas) |
+| `GET` | `/api/v1/health` | Status de saúde e conectividade com o Kubernetes |
+| `GET` | `/api/v1/apps` | Lista aplicações em todos os namespaces |
+| `POST` | `/api/v1/apps` | Cria aplicação no namespace dedicado e vincula ofertas |
 | `GET` | `/api/v1/apps/:name` | Detalhes da aplicação, pods ativos e envs injetadas |
-| `DELETE`| `/api/v1/apps/:name` | Remove a aplicação e seus serviços |
-| `GET` | `/api/v1/apps/:name/logs` | Exibe os logs recentes dos pods em tempo real |
-| `GET` | `/api/v1/offers` | Lista catálogo de ofertas e status de instalação |
-| `POST` | `/api/v1/offers/:id/install` | Instala a stack da oferta no cluster Minikube |
-| `POST` | `/api/v1/apps/:name/links` | Linka uma oferta à aplicação |
-| `DELETE`| `/api/v1/apps/:name/links/:offerId` | Deslinka uma oferta da aplicação |
-| `GET` | `/api/v1/registry` | Status e configuração do Docker Registry |
-| `POST` | `/api/v1/registry` | Salva credenciais e sincroniza secret no Kubernetes |
+| `DELETE`| `/api/v1/apps/:name` | Remove a aplicação e limpa seu namespace dedicado |
+| `GET` | `/api/v1/apps/:name/logs` | Streaming de logs recentes dos pods em tempo real |
+| `GET` | `/api/v1/offers` | Lista ofertas disponíveis e status de instalação no cluster |
+| `POST` | `/api/v1/offers/:id/install` | Instala os componentes de cluster da oferta (Kafka, Prometheus, etc.) |
+| `POST` | `/api/v1/apps/:name/links` | Vincula uma oferta e injeta configurações no pod |
+| `DELETE`| `/api/v1/apps/:name/links/:offerId` | Desvincula a oferta e remove variáveis do pod |
+| `GET` | `/api/v1/registry` | Consulta o status das credenciais do Docker Registry |
+| `POST` | `/api/v1/registry` | Salva credenciais do registry e sincroniza o secret no cluster |
+| `GET` | `/api/v1/openapi.json` | Retorna a especificação OpenAPI 3.0 completa |
 
 ---
 
-## 🧪 Rodando os Testes Unitários
+## 🧪 Testes Unitários
+
+Para rodar a suíte completa de testes unitários:
 
 ```bash
 make test
