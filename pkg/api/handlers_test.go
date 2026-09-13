@@ -94,8 +94,12 @@ func (m *mockOfferService) ListOffers(c *gin.Context) []models.OfferDefinition {
 	return m.offers
 }
 
-func (m *mockOfferService) InstallOffer(c *gin.Context, offerID string) error {
+func (m *mockOfferService) InstallOffer(c *gin.Context, offerID string, prometheus, grafana, otel bool) error {
 	return nil
+}
+
+func (m *mockOfferService) GetOfferStatus(c *gin.Context, offerID string) (map[string]bool, error) {
+	return map[string]bool{"installed": true}, nil
 }
 
 func (m *mockOfferService) BindOffer(c *gin.Context, app *models.Application, offerID string, params map[string]string) (map[string]string, error) {
