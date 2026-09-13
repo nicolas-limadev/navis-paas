@@ -21,7 +21,8 @@ type AppServiceProvider interface {
 // OfferServiceProvider abstracts the catalog & binding engine
 type OfferServiceProvider interface {
 	ListOffers(ctx *gin.Context) []OfferDefinition
-	InstallOffer(ctx *gin.Context, offerID string) error
+	InstallOffer(ctx *gin.Context, offerID string, prometheus, grafana, otel bool) error
+	GetOfferStatus(ctx *gin.Context, offerID string) (map[string]bool, error)
 	BindOffer(ctx *gin.Context, app *Application, offerID string, params map[string]string) (map[string]string, error)
 	UnbindOffer(ctx *gin.Context, app *Application, offerID string) error
 }
@@ -152,12 +153,36 @@ func (h *Handler) ListOffers(c *gin.Context) {
 // InstallOffer triggers installation of the offer's cluster components
 func (h *Handler) InstallOffer(c *gin.Context) {
 	offerID := c.Param("id")
-	if err := h.offers.InstallOffer(c, offerID); err != nil {
+
+	// Parse optional body for component flags
+	var req struct {
+		Prometheus bool `json:"prometheus"`
+		Grafana    bool `json:"grafana"`
+		OTEL       bool `json:"otel"`
+	}
+	// Default to all components if no body
+	req.Prometheus = true
+	req.Grafana = true
+	req.OTEL = false
+	_ = c.ShouldBindJSON(&req)
+
+	if err := h.offers.InstallOffer(c, offerID, req.Prometheus, req.Grafana, req.OTEL); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to install offer '%s': %s", offerID, err.Error())})
 		return
 	}
 
 	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("offer '%s' installed successfully", offerID)})
+}
+
+// GetOfferStatus returns component status for monitoring offer
+func (h *Handler) GetOfferStatus(c *gin.Context) {
+	offerID := c.Param("id")
+	status, err := h.offers.GetOfferStatus(c, offerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, status)
 }
 
 // LinkOffer binds an offer to a specific application

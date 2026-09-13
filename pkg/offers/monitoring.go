@@ -17,25 +17,21 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	MonitoringNamespace = "monitoring"
+)
+
 type MonitoringOffer struct{}
 
 func (m *MonitoringOffer) GetDefinition() models.OfferDefinition {
 	return models.OfferDefinition{
 		ID:          "monitoring",
-		Name:        "Observability Stack (Prometheus + Grafana + OTel)",
+		Name:        "Observability Stack",
 		Category:    "Observability",
-		Description: "Instant metrics scraping, Grafana dashboards, and OpenTelemetry distributed tracing integration.",
-		Version:     "2.54.0 / Grafana 11.2",
-		Icon:        "observability",
+		Description: "Prometheus, Grafana and OpenTelemetry for full-stack observability with auto-discovery.",
+		Version:     "2.54.0",
+		Icon:        "monitoring",
 		Parameters: []models.OfferParameter{
-			{
-				Key:         "metricsPath",
-				Label:       "Metrics Endpoint Path",
-				Type:        "string",
-				Default:     "/metrics",
-				Description: "HTTP endpoint where your application exposes Prometheus metrics",
-				Required:    true,
-			},
 			{
 				Key:         "scrapeInterval",
 				Label:       "Scrape Interval",
@@ -45,11 +41,27 @@ func (m *MonitoringOffer) GetDefinition() models.OfferDefinition {
 				Required:    false,
 			},
 			{
-				Key:         "enableOTel",
-				Label:       "Enable OpenTelemetry Tracing",
-				Type:        "boolean",
+				Key:         "installPrometheus",
+				Label:       "Install Prometheus",
+				Type:        "string",
 				Default:     "true",
-				Description: "Auto-inject OTel SDK Collector endpoints for distributed traces",
+				Description: "Install Prometheus metrics server",
+				Required:    false,
+			},
+			{
+				Key:         "installGrafana",
+				Label:       "Install Grafana",
+				Type:        "string",
+				Default:     "true",
+				Description: "Install Grafana dashboards",
+				Required:    false,
+			},
+			{
+				Key:         "installOTEL",
+				Label:       "Install OpenTelemetry Collector",
+				Type:        "string",
+				Default:     "false",
+				Description: "Install OpenTelemetry Collector for distributed tracing",
 				Required:    false,
 			},
 		},
@@ -60,24 +72,56 @@ func (m *MonitoringOffer) IsInstalled(ctx context.Context, cm *k8s.ClientManager
 	if !cm.Connected {
 		return false, nil
 	}
-	_, err := cm.Clientset.AppsV1().Deployments("monitoring").Get(ctx, "prometheus", metav1.GetOptions{})
+
+	// Check if ANY component is installed
+	prometheusExists, _ := m.isComponentInstalled(ctx, cm, "prometheus")
+	grafanaExists, _ := m.isComponentInstalled(ctx, cm, "grafana")
+	otelExists, _ := m.isComponentInstalled(ctx, cm, "otel-collector")
+
+	return prometheusExists || grafanaExists || otelExists, nil
+}
+
+func (m *MonitoringOffer) isComponentInstalled(ctx context.Context, cm *k8s.ClientManager, component string) (bool, error) {
+	_, err := cm.Clientset.AppsV1().Deployments(MonitoringNamespace).Get(ctx, component, metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}
 	return false, nil
 }
 
-// Install provisions Prometheus and Grafana in the "monitoring" namespace
+func (m *MonitoringOffer) GetComponentStatus(ctx context.Context, cm *k8s.ClientManager) map[string]bool {
+	status := map[string]bool{
+		"prometheus": false,
+		"grafana":    false,
+		"otel":       false,
+	}
+	if !cm.Connected {
+		return status
+	}
+	prometheusExists, _ := m.isComponentInstalled(ctx, cm, "prometheus")
+	grafanaExists, _ := m.isComponentInstalled(ctx, cm, "grafana")
+	otelExists, _ := m.isComponentInstalled(ctx, cm, "otel-collector")
+
+	status["prometheus"] = prometheusExists
+	status["grafana"] = grafanaExists
+	status["otel"] = otelExists
+	return status
+}
+
 func (m *MonitoringOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
+	return m.InstallWithComponents(ctx, cm, true, true, false)
+}
+
+func (m *MonitoringOffer) InstallWithComponents(ctx context.Context, cm *k8s.ClientManager, installPrometheus, installGrafana, installOTEL bool) error {
 	if !cm.Connected {
 		return fmt.Errorf("kubernetes cluster not connected")
 	}
 
-	ns := "monitoring"
+	ns := MonitoringNamespace
 	// 1. Create namespace
 	_, err := cm.Clientset.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, err = cm.Clientset.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
+		nsObj := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ns,
 				Labels: map[string]string{
@@ -88,16 +132,40 @@ func (m *MonitoringOffer) Install(ctx context.Context, cm *k8s.ClientManager) er
 					"navispaas.io/tier":         "observability",
 				},
 				Annotations: map[string]string{
-					"navispaas.io/description": "Prometheus, Grafana and OpenTelemetry observability stack managed by NavisPaaS",
+					"navispaas.io/description": "Observability stack managed by NavisPaaS",
 				},
 			},
-		}, metav1.CreateOptions{})
+		}
+		_, err = cm.Clientset.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{})
 		if err != nil {
 			return fmt.Errorf("failed to create monitoring namespace: %w", err)
 		}
 	}
 
-	// 2. Prometheus ConfigMap with Pod Scrape Discovery
+	if installPrometheus {
+		if err := m.installPrometheus(ctx, cm); err != nil {
+			return fmt.Errorf("failed to install prometheus: %w", err)
+		}
+	}
+
+	if installGrafana {
+		if err := m.installGrafana(ctx, cm); err != nil {
+			return fmt.Errorf("failed to install grafana: %w", err)
+		}
+	}
+
+	if installOTEL {
+		if err := m.installOTEL(ctx, cm); err != nil {
+			return fmt.Errorf("failed to install otel: %w", err)
+		}
+	}
+
+	return nil
+}
+
+func (m *MonitoringOffer) installPrometheus(ctx context.Context, cm *k8s.ClientManager) error {
+	ns := MonitoringNamespace
+
 	promConfig := `
 global:
   scrape_interval: 15s
@@ -138,12 +206,11 @@ scrape_configs:
 			"prometheus.yml": promConfig,
 		},
 	}
-	_, err = cm.Clientset.CoreV1().ConfigMaps(ns).Get(ctx, "prometheus-config", metav1.GetOptions{})
+	_, err := cm.Clientset.CoreV1().ConfigMaps(ns).Get(ctx, "prometheus-config", metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		_, _ = cm.Clientset.CoreV1().ConfigMaps(ns).Create(ctx, promCM, metav1.CreateOptions{})
 	}
 
-	// 3. Prometheus Deployment & Service
 	promReplicas := int32(1)
 	promDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -206,7 +273,12 @@ scrape_configs:
 		_, _ = cm.Clientset.CoreV1().Services(ns).Create(ctx, promSvc, metav1.CreateOptions{})
 	}
 
-	// 4. Grafana Config & Datasource
+	return nil
+}
+
+func (m *MonitoringOffer) installGrafana(ctx context.Context, cm *k8s.ClientManager) error {
+	ns := MonitoringNamespace
+
 	grafanaDatasource := `
 apiVersion: 1
 datasources:
@@ -225,12 +297,11 @@ datasources:
 			"datasources.yaml": grafanaDatasource,
 		},
 	}
-	_, err = cm.Clientset.CoreV1().ConfigMaps(ns).Get(ctx, "grafana-datasources", metav1.GetOptions{})
+	_, err := cm.Clientset.CoreV1().ConfigMaps(ns).Get(ctx, "grafana-datasources", metav1.GetOptions{})
 	if errors.IsNotFound(err) {
 		_, _ = cm.Clientset.CoreV1().ConfigMaps(ns).Create(ctx, grafanaCM, metav1.CreateOptions{})
 	}
 
-	// 5. Grafana Deployment & Service
 	grafanaReplicas := int32(1)
 	grafanaDep := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -302,7 +373,141 @@ datasources:
 	return nil
 }
 
-// Bind annotates the application deployment for Prometheus scraping and injects OTel configuration
+func (m *MonitoringOffer) installOTEL(ctx context.Context, cm *k8s.ClientManager) error {
+	ns := MonitoringNamespace
+
+	otelConfig := `
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['localhost:8888']
+
+processors:
+  batch:
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+  logging:
+    loglevel: debug
+
+service:
+  pipelines:
+    metrics:
+      receivers: [otlp, prometheus]
+      processors: [batch]
+      exporters: [prometheus]
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [logging]
+`
+	otelCM := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "otel-collector-config",
+			Namespace: ns,
+		},
+		Data: map[string]string{
+			"config.yaml": otelConfig,
+		},
+	}
+	_, err := cm.Clientset.CoreV1().ConfigMaps(ns).Get(ctx, "otel-collector-config", metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, _ = cm.Clientset.CoreV1().ConfigMaps(ns).Create(ctx, otelCM, metav1.CreateOptions{})
+	}
+
+	otelReplicas := int32(1)
+	otelDep := &appsv1.Deployment{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "otel-collector",
+			Namespace: ns,
+			Labels:    map[string]string{"app": "otel-collector", "navispaas.io/managed-by": "navispaas"},
+		},
+		Spec: appsv1.DeploymentSpec{
+			Replicas: &otelReplicas,
+			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "otel-collector"}},
+			Template: corev1.PodTemplateSpec{
+				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "otel-collector"}},
+				Spec: corev1.PodSpec{
+					Containers: []corev1.Container{
+						{
+							Name:  "otel-collector",
+							Image: "otel/opentelemetry-collector-contrib:0.108.0",
+							Args:  []string{"--config=/etc/otel/config.yaml"},
+							Ports: []corev1.ContainerPort{
+								{Name: "otlp-grpc", ContainerPort: 4317},
+								{Name: "otlp-http", ContainerPort: 4318},
+								{Name: "metrics", ContainerPort: 8889},
+							},
+							VolumeMounts: []corev1.VolumeMount{
+								{Name: "config", MountPath: "/etc/otel"},
+							},
+						},
+					},
+					Volumes: []corev1.Volume{
+						{
+							Name: "config",
+							VolumeSource: corev1.VolumeSource{
+								ConfigMap: &corev1.ConfigMapVolumeSource{
+									LocalObjectReference: corev1.LocalObjectReference{Name: "otel-collector-config"},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+	_, err = cm.Clientset.AppsV1().Deployments(ns).Get(ctx, "otel-collector", metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, _ = cm.Clientset.AppsV1().Deployments(ns).Create(ctx, otelDep, metav1.CreateOptions{})
+	}
+
+	otelSvc := &corev1.Service{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "otel-collector-service",
+			Namespace: ns,
+			Labels:    map[string]string{"app": "otel-collector"},
+		},
+		Spec: corev1.ServiceSpec{
+			Type:     corev1.ServiceTypeNodePort,
+			Selector: map[string]string{"app": "otel-collector"},
+			Ports: []corev1.ServicePort{
+				{Name: "otlp-grpc", Port: 4317, TargetPort: intstr.FromInt(4317), NodePort: 30317},
+				{Name: "otlp-http", Port: 4318, TargetPort: intstr.FromInt(4318), NodePort: 30318},
+				{Name: "metrics", Port: 8889, TargetPort: intstr.FromInt(8889), NodePort: 30889},
+			},
+		},
+	}
+	_, err = cm.Clientset.CoreV1().Services(ns).Get(ctx, "otel-collector-service", metav1.GetOptions{})
+	if errors.IsNotFound(err) {
+		_, _ = cm.Clientset.CoreV1().Services(ns).Create(ctx, otelSvc, metav1.CreateOptions{})
+	}
+
+	return nil
+}
+
+func (m *MonitoringOffer) UninstallComponent(ctx context.Context, cm *k8s.ClientManager, component string) error {
+	if !cm.Connected {
+		return fmt.Errorf("kubernetes cluster not connected")
+	}
+
+	ns := MonitoringNamespace
+	_ = cm.Clientset.AppsV1().Deployments(ns).Delete(ctx, component, metav1.DeleteOptions{})
+	_ = cm.Clientset.CoreV1().Services(ns).Delete(ctx, component+"-service", metav1.DeleteOptions{})
+
+	return nil
+}
+
 func (m *MonitoringOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *models.Application, params map[string]string) (map[string]string, error) {
 	if !cm.Connected {
 		return nil, fmt.Errorf("kubernetes cluster not connected")
@@ -323,22 +528,19 @@ func (m *MonitoringOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *
 		return nil, fmt.Errorf("application deployment not found: %w", err)
 	}
 
-	// 1. Pod annotations for Prometheus Scraper and OTel
 	if dep.Spec.Template.Annotations == nil {
 		dep.Spec.Template.Annotations = make(map[string]string)
 	}
 	dep.Spec.Template.Annotations["prometheus.io/scrape"] = "true"
 	dep.Spec.Template.Annotations["prometheus.io/path"] = metricsPath
 	dep.Spec.Template.Annotations["prometheus.io/port"] = strconv.Itoa(int(appPort))
-	dep.Spec.Template.Annotations["instrumentation.opentelemetry.io/inject-sdk"] = "true"
 
-	// 2. Inject environment variables into application container
 	injectedEnvs := map[string]string{
-		"METRICS_PATH":                metricsPath,
-		"PROMETHEUS_SCRAPE_PORT":      strconv.Itoa(int(appPort)),
-		"OTEL_SERVICE_NAME":           app.Name,
-		"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector.monitoring.svc.cluster.local:4317",
-		"GRAFANA_DASHBOARD_URL":       "http://192.168.49.2:30080",
+		"METRICS_PATH":           metricsPath,
+		"PROMETHEUS_SCRAPE_PORT": strconv.Itoa(int(appPort)),
+		"PROMETHEUS_URL":         "http://prometheus-service.monitoring.svc.cluster.local:9090",
+		"GRAFANA_DASHBOARD_URL":  "http://192.168.49.2:30080",
+		"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector-service.monitoring.svc.cluster.local:4317",
 	}
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 {
@@ -360,7 +562,6 @@ func (m *MonitoringOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *
 		}
 	}
 
-	// 3. Update LinkedOffer annotation
 	var linkedOffers []models.LinkedOffer
 	if dep.Annotations != nil && dep.Annotations[k8s.AnnotationOffers] != "" {
 		_ = json.Unmarshal([]byte(dep.Annotations[k8s.AnnotationOffers]), &linkedOffers)
@@ -368,7 +569,7 @@ func (m *MonitoringOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *
 
 	newOffer := models.LinkedOffer{
 		OfferID:   "monitoring",
-		OfferName: "Prometheus & Grafana Observability",
+		OfferName: "Observability Stack",
 		BoundAt:   time.Now(),
 		Config:    injectedEnvs,
 	}
@@ -399,7 +600,6 @@ func (m *MonitoringOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *
 	return injectedEnvs, nil
 }
 
-// Unbind removes Prometheus annotations and monitoring variables
 func (m *MonitoringOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app *models.Application) error {
 	if !cm.Connected {
 		return fmt.Errorf("kubernetes cluster not connected")
@@ -410,21 +610,18 @@ func (m *MonitoringOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app
 		return err
 	}
 
-	// Remove pod annotations
 	if dep.Spec.Template.Annotations != nil {
 		delete(dep.Spec.Template.Annotations, "prometheus.io/scrape")
 		delete(dep.Spec.Template.Annotations, "prometheus.io/path")
 		delete(dep.Spec.Template.Annotations, "prometheus.io/port")
-		delete(dep.Spec.Template.Annotations, "instrumentation.opentelemetry.io/inject-sdk")
 	}
 
-	// Remove env vars
 	monitoringKeys := map[string]bool{
 		"METRICS_PATH":                true,
 		"PROMETHEUS_SCRAPE_PORT":      true,
-		"OTEL_SERVICE_NAME":           true,
-		"OTEL_EXPORTER_OTLP_ENDPOINT": true,
+		"PROMETHEUS_URL":              true,
 		"GRAFANA_DASHBOARD_URL":       true,
+		"OTEL_EXPORTER_OTLP_ENDPOINT": true,
 	}
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 {
@@ -437,7 +634,6 @@ func (m *MonitoringOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app
 		dep.Spec.Template.Spec.Containers[0].Env = filteredEnv
 	}
 
-	// Update LinkedOffer annotation
 	var linkedOffers []models.LinkedOffer
 	if dep.Annotations != nil && dep.Annotations[k8s.AnnotationOffers] != "" {
 		_ = json.Unmarshal([]byte(dep.Annotations[k8s.AnnotationOffers]), &linkedOffers)

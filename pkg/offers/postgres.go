@@ -43,7 +43,7 @@ func (p *PostgresOffer) GetDefinition() models.OfferDefinition {
 				Key:         "username",
 				Label:       "DB Username",
 				Type:        "string",
-				Default:     "navisuser",
+				Default:     "postgres",
 				Description: "PostgreSQL master username",
 				Required:    false,
 			},
@@ -127,8 +127,8 @@ func (p *PostgresOffer) Install(ctx context.Context, cm *k8s.ClientManager) erro
 							Name:  "postgres",
 							Image: "postgres:16-alpine",
 							Env: []corev1.EnvVar{
-								{Name: "POSTGRES_DB", Value: "navisdb"},
-								{Name: "POSTGRES_USER", Value: "navisuser"},
+								{Name: "POSTGRES_DB", Value: "postgres"},
+								{Name: "POSTGRES_USER", Value: "postgres"},
 								{Name: "POSTGRES_PASSWORD", Value: "navispass123"},
 							},
 							Ports: []corev1.ContainerPort{{ContainerPort: 5432, Name: "postgres"}},
@@ -172,11 +172,11 @@ func (p *PostgresOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *mo
 	}
 	dbName := params["databaseName"]
 	if dbName == "" {
-		dbName = "navisdb"
+		dbName = "postgres"
 	}
 	user := params["username"]
 	if user == "" {
-		user = "navisuser"
+		user = "postgres"
 	}
 	pass := "navispass123"
 

@@ -52,6 +52,7 @@ func SetupRouter(h *Handler, staticDir string) *gin.Engine {
 		// Offers Catalog
 		v1.GET("/offers", h.ListOffers)
 		v1.POST("/offers/:id/install", h.InstallOffer)
+		v1.GET("/offers/:id/status", h.GetOfferStatus)
 
 		// Service Binding
 		v1.POST("/apps/:name/links", h.LinkOffer)

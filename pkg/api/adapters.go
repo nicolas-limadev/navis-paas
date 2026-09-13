@@ -54,12 +54,41 @@ func (o *OfferAdapter) ListOffers(c *gin.Context) []OfferDefinition {
 	return o.catalog.ListOffers(c.Request.Context())
 }
 
-func (o *OfferAdapter) InstallOffer(c *gin.Context, offerID string) error {
+func (o *OfferAdapter) InstallOffer(c *gin.Context, offerID string, prometheus, grafana, otel bool) error {
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return err
 	}
+
+	// If it's the monitoring offer, use component-level install
+	if offerID == "monitoring" {
+		if m, ok := handler.(*offers.MonitoringOffer); ok {
+			return m.InstallWithComponents(c.Request.Context(), o.cm, prometheus, grafana, otel)
+		}
+	}
+
 	return handler.Install(c.Request.Context(), o.cm)
+}
+
+func (o *OfferAdapter) GetOfferStatus(c *gin.Context, offerID string) (map[string]bool, error) {
+	handler, err := o.catalog.GetOffer(offerID)
+	if err != nil {
+		return nil, err
+	}
+
+	// If it's the monitoring offer, get component status
+	if offerID == "monitoring" {
+		if m, ok := handler.(*offers.MonitoringOffer); ok {
+			return m.GetComponentStatus(c.Request.Context(), o.cm), nil
+		}
+	}
+
+	// For other offers, just return installed status
+	installed, err := handler.IsInstalled(c.Request.Context(), o.cm)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]bool{"installed": installed}, nil
 }
 
 func (o *OfferAdapter) BindOffer(c *gin.Context, app *Application, offerID string, params map[string]string) (map[string]string, error) {

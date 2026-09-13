@@ -5,7 +5,8 @@ let state = {
   offers: [],
   cluster: {},
   registry: {},
-  currentDetailApp: null
+  currentDetailApp: null,
+  monitoringStatus: {}
 };
 
 // Initialization
@@ -69,6 +70,20 @@ async function fetchOffers() {
     const res = await fetch('/api/v1/offers');
     const offers = await res.json();
     state.offers = Array.isArray(offers) ? offers : [];
+    
+    // Fetch monitoring component status if installed
+    const monitoringOffer = state.offers.find(o => o.id === 'monitoring');
+    if (monitoringOffer && monitoringOffer.installed) {
+      try {
+        const statusRes = await fetch('/api/v1/offers/monitoring/status');
+        state.monitoringStatus = await statusRes.json();
+      } catch (e) {
+        state.monitoringStatus = {};
+      }
+    } else {
+      state.monitoringStatus = {};
+    }
+    
     renderOffers();
   } catch (err) {
     console.error('Failed to fetch offers:', err);
@@ -134,6 +149,8 @@ function renderApps() {
 function renderOffers() {
   const container = document.getElementById('offersList');
   container.innerHTML = state.offers.map(offer => {
+    const isMonitoring = offer.id === 'monitoring';
+    const status = state.monitoringStatus || {};
     return `
       <div class="card">
         <div class="card-header">
@@ -150,20 +167,46 @@ function renderOffers() {
           ${offer.description}
         </p>
 
+        ${isMonitoring ? `
+          <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
+            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:0.75rem;">Components</div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;color:var(--text-secondary);">
+                <input type="checkbox" id="monitor-prometheus" ${status.prometheus ? 'checked' : ''} style="accent-color:var(--accent-cyan);">
+                <span><strong style="color:var(--text-primary);">Prometheus</strong> - Metrics collection & storage ${status.prometheus ? '<span style="color:#22c55e;font-size:0.75rem;">(installed)</span>' : ''}</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;color:var(--text-secondary);">
+                <input type="checkbox" id="monitor-grafana" ${status.grafana ? 'checked' : ''} style="accent-color:var(--accent-cyan);">
+                <span><strong style="color:var(--text-primary);">Grafana</strong> - Dashboards & visualization ${status.grafana ? '<span style="color:#22c55e;font-size:0.75rem;">(installed)</span>' : ''}</span>
+              </label>
+              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;color:var(--text-secondary);">
+                <input type="checkbox" id="monitor-otel" ${status.otel ? 'checked' : ''} style="accent-color:var(--accent-cyan);">
+                <span><strong style="color:var(--text-primary);">OpenTelemetry</strong> - Distributed tracing ${status.otel ? '<span style="color:#22c55e;font-size:0.75rem;">(installed)</span>' : ''}</span>
+              </label>
+            </div>
+          </div>
+        ` : ''}
+
         <div class="card-meta">
           <span>Version: <strong>${offer.version}</strong></span>
           <span>Auto-Binding Envs: <strong>Supported</strong></span>
         </div>
 
         <div class="card-actions">
-          ${!offer.installed ? `
-            <button class="btn btn-primary btn-sm" onclick="handleInstallOffer('${offer.id}')">
-              ⚡ Install to Minikube
+          ${isMonitoring ? `
+            <button class="btn btn-primary btn-sm" onclick="handleInstallMonitoring()">
+              ${offer.installed ? '⚡ Update Components' : '⚡ Install to Minikube'}
             </button>
           ` : `
-            <button class="btn btn-outline btn-sm" disabled style="opacity:0.6;cursor:default;">
-              ✓ Installed
-            </button>
+            ${!offer.installed ? `
+              <button class="btn btn-primary btn-sm" onclick="handleInstallOffer('${offer.id}')">
+                ⚡ Install to Minikube
+              </button>
+            ` : `
+              <button class="btn btn-outline btn-sm" disabled style="opacity:0.6;cursor:default;">
+                ✓ Installed
+              </button>
+            `}
           `}
           ${offer.id === 'monitoring' && offer.installed ? `
             <a href="http://192.168.49.2:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
@@ -386,6 +429,37 @@ async function handleInstallOffer(offerId) {
 
   try {
     const res = await fetch(`/api/v1/offers/${offerId}/install`, { method: 'POST' });
+    const data = await res.json();
+    alert(data.message || 'Installed successfully');
+    fetchOffers();
+  } catch (err) {
+    alert('Installation failed: ' + err.message);
+  }
+}
+
+async function handleInstallMonitoring() {
+  const prometheus = document.getElementById('monitor-prometheus')?.checked || false;
+  const grafana = document.getElementById('monitor-grafana')?.checked || false;
+  const otel = document.getElementById('monitor-otel')?.checked || false;
+
+  if (!prometheus && !grafana && !otel) {
+    alert('Please select at least one component to install.');
+    return;
+  }
+
+  const components = [];
+  if (prometheus) components.push('Prometheus');
+  if (grafana) components.push('Grafana');
+  if (otel) components.push('OpenTelemetry');
+
+  if (!confirm(`Install ${components.join(', ')} onto Minikube?`)) return;
+
+  try {
+    const res = await fetch('/api/v1/offers/monitoring/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prometheus, grafana, otel })
+    });
     const data = await res.json();
     alert(data.message || 'Installed successfully');
     fetchOffers();
