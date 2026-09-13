@@ -112,7 +112,8 @@ Acesse:
 
 | Comando | Descrição |
 | :--- | :--- |
-| `make build` | Compila o binário otimizado em `bin/navispaas` |
+| `make build` | Compila o binário do servidor em `bin/navispaas` |
+| `make build-cli` | Compila o CLI em `bin/navis` |
 | `make run` | Compila e inicia o servidor do NavisPaaS na porta 8080 |
 | `make minikube-start` | Inicia o Minikube local com perfil recomendado |
 | `make k3d-start` | Inicia cluster k3d (K3s em Docker) |
@@ -120,8 +121,101 @@ Acesse:
 | `make tunnel` | Inicia o **Minikube Tunnel** para LoadBalancer |
 | `make backstage` | Inicializa o **Spotify Backstage** com templates NavisPaaS |
 | `make test` | Executa a suíte de testes unitários com flags verbosas |
-| `make minikube-start` | Inicia o Minikube local com perfil recomendado (2 CPUs, 4GB RAM) |
 | `make clean` | Remove os binários gerados na pasta `bin/` |
+
+---
+
+## 🖥️ NavisPaaS CLI
+
+O CLI permite aos desenvolvedores gerenciar aplicações sem acessar o dashboard web.
+
+### Instalação
+
+```bash
+# Compilar o CLI
+make build-cli
+
+# Ou instalar globalmente
+go install ./cmd/navis@latest
+```
+
+### Configuração
+
+```bash
+# Criar arquivo de configuração
+navis init
+
+# Editar .navis.yml com os dados da sua aplicação
+```
+
+### Exemplo .navis.yml
+
+```yaml
+app:
+  name: minha-api
+  image: minha-api:v1
+  port: 3000
+  replicas: 2
+
+offers:
+  - name: postgresql
+    enabled: true
+    params:
+      username: admin
+      password: secret123
+      databaseName: production
+  - name: monitoring
+    enabled: true
+    components:
+      prometheus: true
+      grafana: true
+
+server:
+  url: http://localhost:8080
+```
+
+### Comandos
+
+| Comando | Descrição |
+| :--- | :--- |
+| `navis init` | Cria arquivo `.navis.yml` de configuração |
+| `navis deploy` | Deploy da aplicação baseado no `.navis.yml` |
+| `navis list` | Lista aplicações deployadas |
+| `navis link <app> -o <offer>` | Vincula uma oferta à aplicação |
+| `navis unlink <app> <offer>` | Desvincula uma oferta |
+| `navis logs <app>` | Exibe logs da aplicação |
+| `navis install <offer>` | Instala componentes da oferta no cluster |
+| `navis status` | Mostra status do cluster e ofertas |
+| `navis delete <app>` | Remove a aplicação |
+
+### Exemplos
+
+```bash
+# Deploy completo
+navis deploy
+
+# Instalar PostgreSQL com usuário customizado
+navis install postgresql
+
+# Linkar PostgreSQL com parâmetros
+navis link minha-api -o postgresql -p username=admin,password=secret
+
+# Ver logs
+navis logs minha-api -n 50
+
+# Ver status do cluster
+navis status
+```
+
+### Variável de Ambiente
+
+```bash
+# Definir URL do servidor
+export NAVIS_SERVER=http://navispaas.example.com:8080
+
+# Ou usar flag
+navis --server http://navispaas.example.com:8080 status
+```
 
 ---
 

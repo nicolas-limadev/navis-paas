@@ -1,9 +1,13 @@
-.PHONY: build test run clean minikube-start k3d-start kind-start tunnel backstage
+.PHONY: build build-cli test run clean minikube-start k3d-start kind-start tunnel backstage
 
 BINARY_NAME=bin/navispaas
+CLI_BINARY=bin/navis
 
 build:
 	go build -o $(BINARY_NAME) cmd/server/main.go
+
+build-cli:
+	go build -o $(CLI_BINARY) ./cmd/navis
 
 test:
 	go test ./... -v
