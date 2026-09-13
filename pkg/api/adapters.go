@@ -129,12 +129,35 @@ func (ca *ClusterAdapter) CheckStatus(c *gin.Context) ClusterStatus {
 		serverURL = ca.cm.Config.Host
 	}
 
+	// Detect provider
+	provider := ca.cm.GetProvider()
+	providerName := string(provider.Name)
+	providerInfo := ""
+	switch provider.Name {
+	case k8s.ProviderMinikube:
+		providerInfo = "Minikube - Use 'make tunnel' for LoadBalancer access"
+	case k8s.ProviderK3d:
+		providerInfo = "k3d - Services exposed on localhost ports"
+	case k8s.ProviderKind:
+		providerInfo = "Kind - Use 'kubectl port-forward' for service access"
+	case k8s.ProviderDockerDesktop:
+		providerInfo = "Docker Desktop - Use 'kubectl port-forward' for service access"
+	case k8s.ProviderRancherDesktop:
+		providerInfo = "Rancher Desktop - Use 'kubectl port-forward' for service access"
+	case k8s.ProviderMicroK8s:
+		providerInfo = "MicroK8s - Use 'kubectl port-forward' for service access"
+	default:
+		providerInfo = "Unknown provider - Use 'kubectl port-forward' for service access"
+	}
+
 	return ClusterStatus{
 		Connected:      connected,
 		ClusterVersion: version,
 		Context:        ca.cm.ContextName,
 		ServerURL:      serverURL,
-		MinikubeActive: connected,
+		MinikubeActive: connected && provider.Name == k8s.ProviderMinikube,
+		Provider:       providerName,
+		ProviderInfo:   providerInfo,
 		ErrorMessage:   errMsg,
 	}
 }

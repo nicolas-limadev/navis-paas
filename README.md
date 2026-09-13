@@ -56,7 +56,7 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 * 🐳 **Suporte a Docker Registry (Público, Privado e Minikube Local)**:
   * **Docker Hub**: Padrão nativo (`docker.io`) para imagens públicas.
   * **Registries Privados (GHCR, Harbor, ECR, GitLab)**: Gerenciamento de credenciais via UI/API com criação automática de Secret `kubernetes.io/dockerconfigjson` e injeção de `imagePullSecrets`.
-  * **Minikube Local**: Configurado com `imagePullPolicy: IfNotPresent`. Para usar imagens locais sem fazer push, basta rodar `eval $(minikube docker-env)` antes do build.
+  * **Docker Registry**: Configurado com `imagePullPolicy: IfNotPresent`. Para usar imagens locais sem fazer push, configure o Docker environment do seu provedor (ex: `eval $(minikube docker-env)` para Minikube).
 * 🎭 **Integração Nativa com Spotify Backstage**: Inicie o portal com o comando `make backstage` com catálogo e templates do Scaffolder já pré-configurados.
 
 ---
@@ -65,12 +65,36 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 
 ### 1. Pré-requisitos
 * Go >= 1.24
-* Minikube & Kubectl instalados
+* Kubectl instalado
 * Docker
+* Um dos provedores Kubernetes: Minikube, k3d, Kind, Docker Desktop, Rancher Desktop ou MicroK8s
 
-### 2. Iniciar o Cluster Minikube
+### 2. Iniciar o Cluster (escolha um)
+
+#### Minikube (Recomendado para desenvolvimento local)
 ```bash
 make minikube-start
+make tunnel  # Em terminal separado para LoadBalancer
+```
+
+#### k3d (K3s em Docker - rápido e leve)
+```bash
+make k3d-start
+```
+
+#### Kind (Kubernetes em Docker)
+```bash
+make kind-start
+```
+
+#### Docker Desktop / Rancher Desktop
+1. Habilite Kubernetes nas configurações do seu provedor
+2. Execute: `kubectl config use-context docker-desktop` (ou `rancher-desktop`)
+
+#### MicroK8s
+```bash
+microk8s enable dns storage
+microk8s config > ~/.kube/config
 ```
 
 ### 3. Compilar e Rodar o NavisPaaS
@@ -90,36 +114,49 @@ Acesse:
 | :--- | :--- |
 | `make build` | Compila o binário otimizado em `bin/navispaas` |
 | `make run` | Compila e inicia o servidor do NavisPaaS na porta 8080 |
-| `make tunnel` | Inicia o **Minikube Tunnel** para atribuir IPs externos roteáveis às aplicações |
-| `make backstage` | Inicializa o **Spotify Backstage** com os templates do NavisPaaS já plugados |
+| `make minikube-start` | Inicia o Minikube local com perfil recomendado |
+| `make k3d-start` | Inicia cluster k3d (K3s em Docker) |
+| `make kind-start` | Inicia cluster Kind (Kubernetes em Docker) |
+| `make tunnel` | Inicia o **Minikube Tunnel** para LoadBalancer |
+| `make backstage` | Inicializa o **Spotify Backstage** com templates NavisPaaS |
 | `make test` | Executa a suíte de testes unitários com flags verbosas |
 | `make minikube-start` | Inicia o Minikube local com perfil recomendado (2 CPUs, 4GB RAM) |
 | `make clean` | Remove os binários gerados na pasta `bin/` |
 
 ---
 
-## 🌐 Como Acessar suas Aplicações no Minikube
+## 🌐 Como Acessar suas Aplicações
 
-Para acessar os microsserviços após o deploy:
+Para acessar os microsserviços após o deploy, o método varia conforme o provedor Kubernetes:
 
-### Método 1: Minikube Tunnel (Recomendado)
-Em um terminal separado, execute:
+### Minikube
 ```bash
-make tunnel
-```
-O Minikube cria uma rota direta na sua máquina. O Dashboard do NavisPaaS detecta o túnel e exibe o link **"Live URL"** direto no card da aplicação (ex: `http://10.96.x.x:3000`).
+# Método 1: Minikube Tunnel (Recomendado)
+make tunnel  # Em terminal separado
 
-### Método 2: IP do Minikube + NodePort
-Se não estiver usando o túnel, o NavisPaaS também aloca uma porta NodePort automaticamente:
-* Descubra o IP do Minikube: `minikube ip` (ex: `192.168.49.2`)
-* Acesse via: `http://<MINIKUBE_IP>:<NODE_PORT>/` (ex: `http://192.168.49.2:32215/docs/`)
+# Método 2: Abrir service diretamente
+minikube service <nome-da-app> -n <namespace>
 
-### Método 3: Atalho Automático do Minikube
-```bash
-minikube service <nome-da-app> -n <nome-da-app>
+# Método 3: NodePort
+http://192.168.49.2:<NODE_PORT>
 ```
 
-> 💡 **Dica sobre a Porta do Container:** Certifique-se de preencher no formulário de deploy a porta real que sua aplicação escuta (ex: porta `3000` para NestJS/Express, `8080` para Spring Boot/Go, `80` para Nginx).
+### k3d / Kind / Docker Desktop
+```bash
+# Port-forward para acesso local
+kubectl port-forward -n <namespace> svc/<app-name> 8080:<porta>
+# Acesse: http://localhost:8080
+```
+
+### MicroK8s
+```bash
+# Port-forward
+microk8s kubectl port-forward -n <namespace> svc/<app-name> 8080:<porta>
+# Acesse: http://localhost:8080
+```
+
+### Todos os Provedores
+O Dashboard do NavisPaaS detecta automaticamente o provedor e mostra a URL de acesso no card da aplicação.
 
 ---
 

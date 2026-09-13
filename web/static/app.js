@@ -44,10 +44,12 @@ async function fetchClusterHealth() {
 
     if (data.connected) {
       dot.className = 'status-dot connected';
-      text.textContent = `Minikube Ready (${data.clusterVersion || 'v1.32'})`;
+      const provider = data.provider || 'kubernetes';
+      const version = data.clusterVersion || 'v1.32';
+      text.textContent = `${provider.charAt(0).toUpperCase() + provider.slice(1)} Ready (${version})`;
     } else {
       dot.className = 'status-dot';
-      text.textContent = 'Minikube Offline (Start via `minikube start`)';
+      text.textContent = 'Kubernetes Offline (Start your cluster)';
     }
   } catch (err) {
     console.error('Failed to fetch cluster health:', err);
@@ -195,12 +197,12 @@ function renderOffers() {
         <div class="card-actions">
           ${isMonitoring ? `
             <button class="btn btn-primary btn-sm" onclick="handleInstallMonitoring()">
-              ${offer.installed ? '⚡ Update Components' : '⚡ Install to Minikube'}
+              ${offer.installed ? '⚡ Update Components' : '⚡ Install to Cluster'}
             </button>
           ` : `
             ${!offer.installed ? `
               <button class="btn btn-primary btn-sm" onclick="handleInstallOffer('${offer.id}')">
-                ⚡ Install to Minikube
+                ⚡ Install to Cluster
               </button>
             ` : `
               <button class="btn btn-outline btn-sm" disabled style="opacity:0.6;cursor:default;">
@@ -425,7 +427,8 @@ async function handleDeleteApp(appName, appNamespace) {
 }
 
 async function handleInstallOffer(offerId) {
-  if (!confirm(`Install '${offerId}' cluster components onto Minikube?`)) return;
+  const provider = state.cluster?.provider || 'kubernetes';
+  if (!confirm(`Install '${offerId}' cluster components onto ${provider}?`)) return;
 
   try {
     const res = await fetch(`/api/v1/offers/${offerId}/install`, { method: 'POST' });
@@ -452,7 +455,8 @@ async function handleInstallMonitoring() {
   if (grafana) components.push('Grafana');
   if (otel) components.push('OpenTelemetry');
 
-  if (!confirm(`Install ${components.join(', ')} onto Minikube?`)) return;
+  const provider = state.cluster?.provider || 'kubernetes';
+  if (!confirm(`Install ${components.join(', ')} onto ${provider}?`)) return;
 
   try {
     const res = await fetch('/api/v1/offers/monitoring/install', {

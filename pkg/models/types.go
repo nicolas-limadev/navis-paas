@@ -99,6 +99,8 @@ type ClusterStatus struct {
 	Context        string `json:"context,omitempty"`
 	ServerURL      string `json:"serverUrl,omitempty"`
 	MinikubeActive bool   `json:"minikubeActive"`
+	Provider       string `json:"provider,omitempty"`
+	ProviderInfo   string `json:"providerInfo,omitempty"`
 	ErrorMessage   string `json:"errorMessage,omitempty"`
 }
 

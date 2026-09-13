@@ -305,17 +305,31 @@ func (k *KongGatewayOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app 
 		return nil, fmt.Errorf("application deployment not found: %w", err)
 	}
 
-	// Inject environment variables
+	// Get custom parameters with defaults
 	appPort := app.Port
 	if appPort == 0 {
 		appPort = 8080
 	}
 
+	rateLimit := params["rateLimit"]
+	if rateLimit == "" {
+		rateLimit = "100"
+	}
+
+	gatewayPath := params["gatewayPath"]
+	if gatewayPath == "" {
+		gatewayPath = "/" + app.Name
+	}
+
+	// Inject environment variables
 	injectedEnvs := map[string]string{
-		"KONG_PROXY_URL":    "http://kong-proxy.kong.svc.cluster.local:80",
-		"KONG_ADMIN_URL":    "http://kong-admin.kong.svc.cluster.local:8001",
-		"KONG_SERVICE_NAME": app.Name,
-		"KONG_UPSTREAM_URL": fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", app.Name, app.Namespace, appPort),
+		"KONG_PROXY_URL":     "http://kong-proxy.kong.svc.cluster.local:80",
+		"KONG_ADMIN_URL":     "http://kong-admin.kong.svc.cluster.local:8001",
+		"KONG_SERVICE_NAME":  app.Name,
+		"KONG_UPSTREAM_URL":  fmt.Sprintf("http://%s.%s.svc.cluster.local:%d", app.Name, app.Namespace, appPort),
+		"KONG_GATEWAY_PATH":  gatewayPath,
+		"KONG_RATE_LIMIT":    rateLimit,
+		"KONG_PUBLIC_URL":    fmt.Sprintf("http://192.168.49.2:30080%s", gatewayPath),
 	}
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 {
@@ -392,6 +406,9 @@ func (k *KongGatewayOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, ap
 		"KONG_ADMIN_URL":    true,
 		"KONG_SERVICE_NAME": true,
 		"KONG_UPSTREAM_URL": true,
+		"KONG_GATEWAY_PATH": true,
+		"KONG_RATE_LIMIT":   true,
+		"KONG_PUBLIC_URL":   true,
 	}
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 {

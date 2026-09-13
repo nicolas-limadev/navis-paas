@@ -178,7 +178,10 @@ func (p *PostgresOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *mo
 	if user == "" {
 		user = "postgres"
 	}
-	pass := "navispass123"
+	pass := params["password"]
+	if pass == "" {
+		pass = "navispass123"
+	}
 
 	// Check if postgres service is in dedicated 'postgres' namespace or fallback
 	targetNS := PostgresNamespace

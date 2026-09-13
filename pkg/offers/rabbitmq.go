@@ -230,14 +230,32 @@ func (r *RabbitMQOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *mo
 		return nil, fmt.Errorf("application deployment not found: %w", err)
 	}
 
+	// Get custom parameters with defaults
+	user := params["username"]
+	if user == "" {
+		user = "guest"
+	}
+	password := params["password"]
+	if password == "" {
+		password = "guest"
+	}
+	vhost := params["vhost"]
+	if vhost == "" {
+		vhost = "/"
+	}
+	port := params["port"]
+	if port == "" {
+		port = "5672"
+	}
+
 	// Inject environment variables
 	injectedEnvs := map[string]string{
 		"RABBITMQ_HOST":     "rabbitmq-amqp.rabbitmq.svc.cluster.local",
-		"RABBITMQ_PORT":     "5672",
-		"RABBITMQ_USER":     "guest",
-		"RABBITMQ_PASSWORD": "guest",
-		"RABBITMQ_VHOST":    "/",
-		"RABBITMQ_URL":      "amqp://guest:guest@rabbitmq-amqp.rabbitmq.svc.cluster.local:5672/",
+		"RABBITMQ_PORT":     port,
+		"RABBITMQ_USER":     user,
+		"RABBITMQ_PASSWORD": password,
+		"RABBITMQ_VHOST":    vhost,
+		"RABBITMQ_URL":      fmt.Sprintf("amqp://%s:%s@rabbitmq-amqp.rabbitmq.svc.cluster.local:%s/%s", user, password, port, vhost),
 		"RABBITMQ_MGMT_URL": "http://rabbitmq-management.rabbitmq.svc.cluster.local:15672",
 	}
 

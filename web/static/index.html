@@ -65,7 +65,7 @@
         <h2 style="margin-bottom: 0.75rem;">🎭 How Backstage Integrates with NavisPaaS</h2>
         <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
           NavisPaaS provides the execution and service binding engine, while <strong>Spotify Backstage</strong> serves as your Developer Portal.
-          Developers can use Backstage Scaffolder templates to spin up a service and have it automatically configured on Minikube with Kafka and Monitoring.
+          Developers can use Backstage Scaffolder templates to spin up a service and have it automatically configured on your Kubernetes cluster with Kafka and Monitoring.
         </p>
         <div style="display: flex; gap: 1rem; margin-top: 1rem;">
           <a href="/api/v1/openapi.json" target="_blank" class="btn btn-outline btn-sm">OpenAPI Spec (JSON)</a>
@@ -232,7 +232,7 @@
         </div>
 
         <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 0.85rem; font-size: 0.8rem; color: #93c5fd; margin-bottom: 1.5rem;">
-          💡 <strong>Minikube Tip:</strong> For local images without pushing to any remote registry, run <code>eval $(minikube docker-env)</code> before building your Docker image. NavisPaaS configures <code>imagePullPolicy: IfNotPresent</code> so local Minikube images are used instantly.
+          💡 <strong>Local Images Tip:</strong> For local images without pushing to any remote registry, use your provider's Docker environment (e.g., <code>eval $(minikube docker-env)</code> for Minikube). NavisPaaS configures <code>imagePullPolicy: IfNotPresent</code> so local images are used instantly.
         </div>
 
         <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
