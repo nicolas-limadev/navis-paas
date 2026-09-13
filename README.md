@@ -33,7 +33,7 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 │  • Workload Isolado por App (ex: namespace `app-name`) │
 │  • Serviços Type: LoadBalancer (Acesso via `tunnel`)   │
 │  • Oferta Kafka: Apache Kafka (namespace: `kafka`)     │
-│  • Oferta Observability: Prometheus + Grafana (30080)  │
+│  • Oferta Observability: Prometheus + Grafana + OTel     │
 │  • Oferta Dados: PostgreSQL e Redis (namespaces sep.)  │
 └────────────────────────────────────────────────────────┘
 ```
