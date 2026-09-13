@@ -91,7 +91,7 @@ function renderApps() {
     const offersBadges = (app.linkedOffers || []).map(o => `
       <span class="badge badge-offer" title="Bound at ${new Date(o.boundAt).toLocaleTimeString()}">
         ${o.offerName}
-        <button onclick="handleUnlinkOffer('${app.name}', '${o.offerId}', event)" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px;font-weight:bold;">&times;</button>
+        <button onclick="handleUnlinkOffer('${app.name}', '${app.namespace}', '${o.offerId}', event)" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px;font-weight:bold;">&times;</button>
       </span>
     `).join('');
 
@@ -122,9 +122,9 @@ function renderApps() {
         </div>
 
         <div class="card-actions">
-          <button class="btn btn-outline btn-sm" onclick="openLinkOfferModal('${app.name}')">+ Link Offer</button>
-          <button class="btn btn-outline btn-sm" onclick="viewAppDetails('${app.name}')">Logs & Pods</button>
-          <button class="btn btn-danger btn-sm" onclick="handleDeleteApp('${app.name}')">Delete</button>
+          <button class="btn btn-outline btn-sm" onclick="openLinkOfferModal('${app.name}', '${app.namespace}')">+ Link Offer</button>
+          <button class="btn btn-outline btn-sm" onclick="viewAppDetails('${app.name}', '${app.namespace}')">Logs & Pods</button>
+          <button class="btn btn-danger btn-sm" onclick="handleDeleteApp('${app.name}', '${app.namespace}')">Delete</button>
         </div>
       </div>
     `;
@@ -276,8 +276,9 @@ async function handleDeployApp(e) {
   }
 }
 
-function openLinkOfferModal(appName) {
+function openLinkOfferModal(appName, appNamespace) {
   document.getElementById('linkAppTargetName').value = appName;
+  document.getElementById('linkAppTargetNamespace').value = appNamespace || '';
   document.getElementById('linkOfferTitle').textContent = `Link Offer to '${appName}'`;
 
   const select = document.getElementById('linkOfferSelect');
@@ -313,6 +314,7 @@ function renderOfferParameters() {
 async function handleLinkOfferSubmit(e) {
   e.preventDefault();
   const appName = document.getElementById('linkAppTargetName').value;
+  const appNamespace = document.getElementById('linkAppTargetNamespace').value;
   const offerId = document.getElementById('linkOfferSelect').value;
   const offer = state.offers.find(o => o.id === offerId);
 
@@ -325,7 +327,11 @@ async function handleLinkOfferSubmit(e) {
   }
 
   try {
-    const res = await fetch(`/api/v1/apps/${appName}/links`, {
+    const url = appNamespace 
+      ? `/api/v1/apps/${appName}/links?namespace=${encodeURIComponent(appNamespace)}`
+      : `/api/v1/apps/${appName}/links`;
+
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ offerId, parameters })
@@ -344,23 +350,31 @@ async function handleLinkOfferSubmit(e) {
   }
 }
 
-async function handleUnlinkOffer(appName, offerId, e) {
+async function handleUnlinkOffer(appName, appNamespace, offerId, e) {
   e.stopPropagation();
   if (!confirm(`Are you sure you want to unlink '${offerId}' from '${appName}'?`)) return;
 
   try {
-    const res = await fetch(`/api/v1/apps/${appName}/links/${offerId}`, { method: 'DELETE' });
+    const url = appNamespace 
+      ? `/api/v1/apps/${appName}/links/${offerId}?namespace=${encodeURIComponent(appNamespace)}`
+      : `/api/v1/apps/${appName}/links/${offerId}`;
+
+    const res = await fetch(url, { method: 'DELETE' });
     if (res.ok) fetchApps();
   } catch (err) {
     alert('Failed to unlink: ' + err.message);
   }
 }
 
-async function handleDeleteApp(appName) {
+async function handleDeleteApp(appName, appNamespace) {
   if (!confirm(`Are you sure you want to delete application '${appName}'?`)) return;
 
   try {
-    const res = await fetch(`/api/v1/apps/${appName}`, { method: 'DELETE' });
+    const url = appNamespace 
+      ? `/api/v1/apps/${appName}?namespace=${encodeURIComponent(appNamespace)}`
+      : `/api/v1/apps/${appName}`;
+
+    const res = await fetch(url, { method: 'DELETE' });
     if (res.ok) fetchApps();
   } catch (err) {
     alert('Failed to delete: ' + err.message);
@@ -380,9 +394,10 @@ async function handleInstallOffer(offerId) {
   }
 }
 
-async function viewAppDetails(appName) {
+async function viewAppDetails(appName, appNamespace) {
   state.currentDetailApp = appName;
-  document.getElementById('detailAppTitle').textContent = `App Details: ${appName}`;
+  state.currentDetailNamespace = appNamespace;
+  document.getElementById('detailAppTitle').textContent = `App Details: ${appName} (${appNamespace || ''})`;
   document.getElementById('detailPodsList').innerHTML = 'Loading pods...';
   document.getElementById('detailEnvVars').textContent = 'Loading envs...';
   document.getElementById('detailLogs').textContent = 'Fetching logs...';
@@ -390,7 +405,10 @@ async function viewAppDetails(appName) {
   document.getElementById('appDetailsModal').classList.add('open');
 
   try {
-    const res = await fetch(`/api/v1/apps/${appName}`);
+    const url = appNamespace 
+      ? `/api/v1/apps/${appName}?namespace=${encodeURIComponent(appNamespace)}`
+      : `/api/v1/apps/${appName}`;
+    const res = await fetch(url);
     const details = await res.json();
 
     // Render pods
@@ -422,7 +440,10 @@ async function viewAppDetails(appName) {
 async function refreshCurrentLogs() {
   if (!state.currentDetailApp) return;
   try {
-    const res = await fetch(`/api/v1/apps/${state.currentDetailApp}/logs?lines=60`);
+    const url = state.currentDetailNamespace 
+      ? `/api/v1/apps/${state.currentDetailApp}/logs?lines=60&namespace=${encodeURIComponent(state.currentDetailNamespace)}`
+      : `/api/v1/apps/${state.currentDetailApp}/logs?lines=60`;
+    const res = await fetch(url);
     const data = await res.json();
     document.getElementById('detailLogs').textContent = data.logs || 'No logs available.';
   } catch (err) {

@@ -258,29 +258,63 @@ func (s *AppService) ListApps(ctx context.Context, namespace string) ([]models.A
 	return apps, nil
 }
 
+// findAppDeployment locates an application deployment across namespaces reliably
+func (s *AppService) findAppDeployment(ctx context.Context, namespace, name string) (*appsv1.Deployment, error) {
+	// 1. If namespace explicitly provided, look there first
+	if namespace != "" {
+		dep, err := s.clientManager.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+		if err == nil {
+			return dep, nil
+		}
+	}
+
+	// 2. Check namespace matching the app name
+	if dep, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
+		return dep, nil
+	}
+
+	// 3. Check DefaultNamespace (navis-apps)
+	if dep, err := s.clientManager.Clientset.AppsV1().Deployments(DefaultNamespace).Get(ctx, name, metav1.GetOptions{}); err == nil {
+		return dep, nil
+	}
+
+	// 4. Search across all namespaces by label selector
+	list, err := s.clientManager.Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{
+		LabelSelector: fmt.Sprintf("%s=%s", LabelAppName, name),
+	})
+	if err == nil && len(list.Items) > 0 {
+		return &list.Items[0], nil
+	}
+
+	// 5. Global scan across all namespaces for exact deployment name
+	allDeps, err := s.clientManager.Clientset.AppsV1().Deployments("").List(ctx, metav1.ListOptions{})
+	if err == nil {
+		for _, item := range allDeps.Items {
+			if item.Name == name {
+				return &item, nil
+			}
+		}
+	}
+
+	return nil, fmt.Errorf("deployments.apps %q not found in any namespace", name)
+}
+
 // GetApp returns the detailed application information
 func (s *AppService) GetApp(ctx context.Context, namespace, name string) (*models.Application, error) {
 	if !s.clientManager.Connected {
 		return nil, fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
-	if namespace == "" {
-		// First try dedicated app namespace (matching name)
-		if _, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
-			namespace = name
-		} else {
-			namespace = DefaultNamespace
-		}
-	}
 
-	dep, err := s.clientManager.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
+	dep, err := s.findAppDeployment(ctx, namespace, name)
 	if err != nil {
 		return nil, err
 	}
 
 	app := s.convertDeploymentToApp(dep)
+	app.Namespace = dep.Namespace
 
-	// Fetch service
-	svc, err := s.clientManager.Clientset.CoreV1().Services(namespace).Get(ctx, name, metav1.GetOptions{})
+	// Fetch service in the deployment's actual namespace
+	svc, err := s.clientManager.Clientset.CoreV1().Services(dep.Namespace).Get(ctx, name, metav1.GetOptions{})
 	if err == nil {
 		app.ClusterIP = svc.Spec.ClusterIP
 		if len(svc.Spec.Ports) > 0 {
@@ -351,23 +385,22 @@ func (s *AppService) DeleteApp(ctx context.Context, namespace, name string) erro
 	if !s.clientManager.Connected {
 		return fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
-	if namespace == "" {
-		if _, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
-			namespace = name
-		} else {
-			namespace = DefaultNamespace
-		}
+
+	dep, err := s.findAppDeployment(ctx, namespace, name)
+	if err != nil {
+		return err
 	}
+	actualNamespace := dep.Namespace
 
 	// Delete Deployment
-	_ = s.clientManager.Clientset.AppsV1().Deployments(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	_ = s.clientManager.Clientset.AppsV1().Deployments(actualNamespace).Delete(ctx, name, metav1.DeleteOptions{})
 
 	// Delete Service
-	_ = s.clientManager.Clientset.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+	_ = s.clientManager.Clientset.CoreV1().Services(actualNamespace).Delete(ctx, name, metav1.DeleteOptions{})
 
 	// If the application was in its own dedicated namespace, remove the namespace cleanly
-	if namespace == name {
-		_ = s.clientManager.Clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+	if actualNamespace == name {
+		_ = s.clientManager.Clientset.CoreV1().Namespaces().Delete(ctx, actualNamespace, metav1.DeleteOptions{})
 	}
 
 	return nil
@@ -378,18 +411,18 @@ func (s *AppService) GetAppLogs(ctx context.Context, namespace, name string, tai
 	if !s.clientManager.Connected {
 		return "", fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
-	if namespace == "" {
-		if _, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
-			namespace = name
-		} else {
-			namespace = DefaultNamespace
-		}
+
+	dep, err := s.findAppDeployment(ctx, namespace, name)
+	if err != nil {
+		return "", err
 	}
+	actualNamespace := dep.Namespace
+
 	if tailLines <= 0 {
 		tailLines = 100
 	}
 
-	pods, err := s.clientManager.Clientset.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{
+	pods, err := s.clientManager.Clientset.CoreV1().Pods(actualNamespace).List(ctx, metav1.ListOptions{
 		LabelSelector: fmt.Sprintf("%s=%s", LabelAppName, name),
 	})
 	if err != nil || len(pods.Items) == 0 {
