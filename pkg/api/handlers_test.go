@@ -1,0 +1,247 @@
+package api
+
+import (
+	"bytes"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
+	"navispaas/pkg/models"
+
+	"github.com/gin-gonic/gin"
+)
+
+type mockAppService struct {
+	apps map[string]models.Application
+}
+
+func newMockAppService() *mockAppService {
+	return &mockAppService{
+		apps: make(map[string]models.Application),
+	}
+}
+
+func (m *mockAppService) CreateOrUpdateApp(c *gin.Context, req models.CreateAppRequest) (*models.Application, error) {
+	app := models.Application{
+		Name:         req.Name,
+		Namespace:    "navis-apps",
+		Image:        req.Image,
+		Port:         req.Port,
+		Replicas:     1,
+		ReadyCount:   1,
+		Status:       "Running",
+		LinkedOffers: []models.LinkedOffer{},
+		CreatedAt:    time.Now(),
+	}
+	m.apps[req.Name] = app
+	return &app, nil
+}
+
+func (m *mockAppService) ListApps(c *gin.Context, namespace string) ([]models.Application, error) {
+	var list []models.Application
+	for _, a := range m.apps {
+		list = append(list, a)
+	}
+	return list, nil
+}
+
+func (m *mockAppService) GetApp(c *gin.Context, namespace, name string) (*models.Application, error) {
+	app, exists := m.apps[name]
+	if !exists {
+		return nil, http.ErrMissingFile
+	}
+	return &app, nil
+}
+
+func (m *mockAppService) GetAppDetails(c *gin.Context, namespace, name string) (*models.AppDetailResponse, error) {
+	app, err := m.GetApp(c, namespace, name)
+	if err != nil {
+		return nil, err
+	}
+	return &models.AppDetailResponse{
+		Application: *app,
+		Pods: []models.PodInfo{
+			{Name: name + "-pod-xyz", Status: "Running", Restarts: 0},
+		},
+	}, nil
+}
+
+func (m *mockAppService) DeleteApp(c *gin.Context, namespace, name string) error {
+	delete(m.apps, name)
+	return nil
+}
+
+func (m *mockAppService) GetAppLogs(c *gin.Context, namespace, name string, tailLines int64) (string, error) {
+	return "mock container logs line 1\nmock container logs line 2", nil
+}
+
+type mockOfferService struct {
+	offers []models.OfferDefinition
+}
+
+func newMockOfferService() *mockOfferService {
+	return &mockOfferService{
+		offers: []models.OfferDefinition{
+			{ID: "kafka", Name: "Apache Kafka", Category: "Messaging"},
+			{ID: "monitoring", Name: "Observability", Category: "Observability"},
+		},
+	}
+}
+
+func (m *mockOfferService) ListOffers(c *gin.Context) []models.OfferDefinition {
+	return m.offers
+}
+
+func (m *mockOfferService) InstallOffer(c *gin.Context, offerID string) error {
+	return nil
+}
+
+func (m *mockOfferService) BindOffer(c *gin.Context, app *models.Application, offerID string, params map[string]string) (map[string]string, error) {
+	envs := map[string]string{
+		"OFFER_BOUND": offerID,
+	}
+	app.LinkedOffers = append(app.LinkedOffers, models.LinkedOffer{
+		OfferID:   offerID,
+		OfferName: offerID,
+		BoundAt:   time.Now(),
+		Config:    envs,
+	})
+	return envs, nil
+}
+
+func (m *mockOfferService) UnbindOffer(c *gin.Context, app *models.Application, offerID string) error {
+	var filtered []models.LinkedOffer
+	for _, o := range app.LinkedOffers {
+		if o.OfferID != offerID {
+			filtered = append(filtered, o)
+		}
+	}
+	app.LinkedOffers = filtered
+	return nil
+}
+
+type mockClusterChecker struct{}
+
+func (m *mockClusterChecker) CheckStatus(c *gin.Context) models.ClusterStatus {
+	return models.ClusterStatus{
+		Connected:      true,
+		ClusterVersion: "v1.32.0",
+		MinikubeActive: true,
+	}
+}
+
+func setupTestRouter() *gin.Engine {
+	gin.SetMode(gin.TestMode)
+	appSvc := newMockAppService()
+	offerSvc := newMockOfferService()
+	clusterChecker := &mockClusterChecker{}
+
+	h := NewHandler(appSvc, offerSvc, clusterChecker)
+	return SetupRouter(h, "")
+}
+
+func TestHealthEndpoint(t *testing.T) {
+	router := setupTestRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/health", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var status models.ClusterStatus
+	if err := json.Unmarshal(w.Body.Bytes(), &status); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if !status.Connected || !status.MinikubeActive {
+		t.Errorf("expected cluster connected and minikube active")
+	}
+}
+
+func TestOffersEndpoint(t *testing.T) {
+	router := setupTestRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/offers", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var offers []models.OfferDefinition
+	if err := json.Unmarshal(w.Body.Bytes(), &offers); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+
+	if len(offers) != 2 {
+		t.Errorf("expected 2 offers, got %d", len(offers))
+	}
+}
+
+func TestCreateAndListApps(t *testing.T) {
+	router := setupTestRouter()
+
+	// 1. Create app
+	payload := models.CreateAppRequest{
+		Name:     "order-service",
+		Image:    "hashicorp/http-echo:0.2.3",
+		Port:     5678,
+		Replicas: 1,
+		Offers:   []string{"kafka"},
+	}
+	body, _ := json.Marshal(payload)
+
+	req, _ := http.NewRequest("POST", "/api/v1/apps", bytes.NewBuffer(body))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected status 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	// 2. List apps
+	reqList, _ := http.NewRequest("GET", "/api/v1/apps", nil)
+	wList := httptest.NewRecorder()
+	router.ServeHTTP(wList, reqList)
+
+	if wList.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", wList.Code)
+	}
+
+	var apps []models.Application
+	_ = json.Unmarshal(wList.Body.Bytes(), &apps)
+	if len(apps) != 1 {
+		t.Errorf("expected 1 app, got %d", len(apps))
+	}
+	if apps[0].Name != "order-service" {
+		t.Errorf("expected app name 'order-service', got '%s'", apps[0].Name)
+	}
+}
+
+func TestOpenAPISpecEndpoint(t *testing.T) {
+	router := setupTestRouter()
+
+	req, _ := http.NewRequest("GET", "/api/v1/openapi.json", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var spec map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &spec); err != nil {
+		t.Fatalf("failed to decode OpenAPI spec: %v", err)
+	}
+
+	if spec["openapi"] != "3.0.0" {
+		t.Errorf("expected openapi 3.0.0, got %v", spec["openapi"])
+	}
+}

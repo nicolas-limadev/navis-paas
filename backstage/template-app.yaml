@@ -1,0 +1,84 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: navispaas-app-scaffolder
+  title: Microservice with NavisPaaS
+  description: Deploy a microservice into Kubernetes with Apache Kafka and Prometheus/Grafana observability pre-configured.
+  tags:
+    - kubernetes
+    - navispaas
+    - kafka
+    - observability
+spec:
+  owner: platform-engineering
+  type: service
+
+  parameters:
+    - title: Microservice Metadata
+      required:
+        - name
+        - image
+        - port
+      properties:
+        name:
+          title: Service Name
+          type: string
+          description: Unique service name (k8s compliant)
+          pattern: '^[a-z0-9-]+$'
+        image:
+          title: Docker Image
+          type: string
+          description: Image tag to run (e.g. org/orders:v1.0 or nginx:alpine)
+          default: "hashicorp/http-echo:0.2.3"
+        port:
+          title: Container Port
+          type: number
+          description: Port exposed by the container
+          default: 5678
+        replicas:
+          title: Replicas Count
+          type: number
+          default: 1
+
+    - title: Select Infrastructure Offers (Addons)
+      properties:
+        attachMonitoring:
+          title: Attach Observability Stack
+          description: Prometheus metrics scraper, Grafana dashboard, and OpenTelemetry instrumentation
+          type: boolean
+          default: true
+        attachKafka:
+          title: Attach Apache Kafka
+          description: Event streaming with injected KAFKA_BOOTSTRAP_SERVERS, topics, and consumer groups
+          type: boolean
+          default: true
+
+  steps:
+    - id: deploy-navispaas
+      name: Deploying on NavisPaaS Kubernetes Engine
+      action: fetch:plain
+      input:
+        targetPath: ./manifests
+    - id: trigger-navis-api
+      name: Register Application on NavisPaaS API
+      action: http:backstage:request
+      input:
+        method: POST
+        url: http://localhost:8080/api/v1/apps
+        headers:
+          Content-Type: application/json
+        body:
+          name: ${{ parameters.name }}
+          image: ${{ parameters.image }}
+          port: ${{ parameters.port }}
+          replicas: ${{ parameters.replicas }}
+          offers:
+            - ${{ parameters.attachMonitoring ? 'monitoring' : '' }}
+            - ${{ parameters.attachKafka ? 'kafka' : '' }}
+
+  output:
+    links:
+      - title: Open NavisPaaS Dashboard
+        url: http://localhost:8080/
+      - title: Open Grafana Observability
+        url: http://localhost:30080/

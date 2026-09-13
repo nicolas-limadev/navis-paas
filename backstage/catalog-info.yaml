@@ -1,0 +1,31 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: navispaas-engine
+  title: NavisPaaS Control Plane
+  description: Developer-Centric Kubernetes PaaS for Deployments, Kafka Messaging, and Observability.
+  tags:
+    - golang
+    - kubernetes
+    - paas
+    - platform-engineering
+spec:
+  type: service
+  lifecycle: production
+  owner: platform-engineering
+  providesApis:
+    - navispaas-api
+
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: navispaas-api
+  title: NavisPaaS REST API
+  description: OpenAPI 3.0 specification for managing applications, Kafka bindings, and Observability offers on Kubernetes.
+spec:
+  type: openapi
+  lifecycle: production
+  owner: platform-engineering
+  definition:
+    $text: http://localhost:8080/api/v1/openapi.json

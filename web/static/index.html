@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NavisPaaS - Kubernetes Platform for Developers</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- Top Header -->
+  <header>
+    <div class="logo-group">
+      <div class="logo-icon">N</div>
+      <div class="logo-text">
+        <h1>NavisPaaS</h1>
+        <span>Kubernetes Platform Engine</span>
+      </div>
+    </div>
+    <div class="header-status">
+      <div class="cluster-badge" id="clusterStatusBadge">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="clusterStatusText">Connecting...</span>
+      </div>
+      <button class="btn btn-primary" onclick="openDeployModal()">
+        <span>+</span> Deploy Application
+      </button>
+    </div>
+  </header>
+
+  <!-- Main Container -->
+  <div class="container">
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="nav-tab active" onclick="switchTab('apps')">📦 Applications</button>
+      <button class="nav-tab" onclick="switchTab('offers')">🧩 Offers Catalog (Kafka & Monitoring)</button>
+      <button class="nav-tab" onclick="switchTab('backstage')">🎭 Backstage Integration</button>
+    </nav>
+
+    <!-- Tab 1: Applications -->
+    <section id="apps-tab" class="tab-content active">
+      <div id="appsList" class="cards-grid">
+        <!-- Rendered dynamically via JS -->
+      </div>
+      <div id="appsEmpty" class="empty-state" style="display: none;">
+        <h3>No applications deployed yet</h3>
+        <p>Deploy your first microservice and link Kafka or Monitoring in one click.</p>
+        <button class="btn btn-primary" onclick="openDeployModal()">Deploy Sample App</button>
+      </div>
+    </section>
+
+    <!-- Tab 2: Offers Catalog -->
+    <section id="offers-tab" class="tab-content">
+      <div id="offersList" class="cards-grid">
+        <!-- Rendered dynamically via JS -->
+      </div>
+    </section>
+
+    <!-- Tab 3: Backstage Integration -->
+    <section id="backstage-tab" class="tab-content">
+      <div class="card" style="margin-bottom: 2rem;">
+        <h2 style="margin-bottom: 0.75rem;">🎭 How Backstage Integrates with NavisPaaS</h2>
+        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
+          NavisPaaS provides the execution and service binding engine, while <strong>Spotify Backstage</strong> serves as your Developer Portal.
+          Developers can use Backstage Scaffolder templates to spin up a service and have it automatically configured on Minikube with Kafka and Monitoring.
+        </p>
+        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+          <a href="/api/v1/openapi.json" target="_blank" class="btn btn-outline btn-sm">OpenAPI Spec (JSON)</a>
+          <a href="#template-preview" class="btn btn-outline btn-sm">View Scaffolder Template</a>
+        </div>
+      </div>
+
+      <div class="card" id="template-preview">
+        <h3 style="margin-bottom: 1rem;">Backstage Scaffolder Template (template.yaml)</h3>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Drop this template into your Backstage catalog to give developers a self-service form:
+        </p>
+        <div class="code-box" id="backstageTemplateCode">Loading template...</div>
+      </div>
+    </section>
+  </div>
+
+  <!-- Deploy App Modal -->
+  <div class="modal-backdrop" id="deployModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Deploy New Application</h2>
+        <button class="modal-close" onclick="closeModal('deployModal')">&times;</button>
+      </div>
+      <form id="deployForm" onsubmit="handleDeployApp(event)">
+        <div class="form-group">
+          <label>Application Name</label>
+          <input type="text" id="appName" class="form-control" placeholder="e.g. order-service" required>
+        </div>
+        <div class="form-group">
+          <label>Container Image</label>
+          <input type="text" id="appImage" class="form-control" placeholder="e.g. hashicorp/http-echo:0.2.3 or nginx:alpine" required>
+        </div>
+        <div class="form-group">
+          <label>Target Container Port</label>
+          <input type="number" id="appPort" class="form-control" value="5678" required>
+        </div>
+        <div class="form-group">
+          <label>Replicas</label>
+          <input type="number" id="appReplicas" class="form-control" value="1" min="1" max="10">
+        </div>
+
+        <div class="form-group" style="margin-top: 1.5rem;">
+          <label>Auto-Link Offers on Launch</label>
+          <label class="form-checkbox">
+            <input type="checkbox" id="offerCheckMonitoring" checked>
+            <span>📊 <strong>Observability Stack</strong> (Prometheus metrics & Grafana dashboard)</span>
+          </label>
+          <label class="form-checkbox">
+            <input type="checkbox" id="offerCheckKafka" checked>
+            <span>⚡ <strong>Apache Kafka</strong> (Auto-inject bootstrap servers & topic vars)</span>
+          </label>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('deployModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Deploy to Kubernetes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Link Offer Modal -->
+  <div class="modal-backdrop" id="linkOfferModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="linkOfferTitle">Link Offer to App</h2>
+        <button class="modal-close" onclick="closeModal('linkOfferModal')">&times;</button>
+      </div>
+      <form id="linkOfferForm" onsubmit="handleLinkOfferSubmit(event)">
+        <input type="hidden" id="linkAppTargetName">
+        <div class="form-group">
+          <label>Select Offer</label>
+          <select id="linkOfferSelect" class="form-control" onchange="renderOfferParameters()">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <div id="offerDynamicParams">
+          <!-- Populated based on offer selection -->
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('linkOfferModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Attach Offer & Inject Envs</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- App Details & Pods Modal -->
+  <div class="modal-backdrop" id="appDetailsModal">
+    <div class="modal" style="max-width: 750px;">
+      <div class="modal-header">
+        <h2 id="detailAppTitle">Application Details</h2>
+        <button class="modal-close" onclick="closeModal('appDetailsModal')">&times;</button>
+      </div>
+      
+      <div style="margin-bottom: 1.5rem;">
+        <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Running Pods</h4>
+        <div id="detailPodsList" style="margin-bottom: 1.5rem;"></div>
+
+        <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Injected Environment Variables</h4>
+        <div class="code-box" id="detailEnvVars" style="max-height: 140px; margin-bottom: 1.5rem;"></div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <h4 style="color: var(--text-secondary);">Pod Logs (Live Stream)</h4>
+          <button class="btn btn-outline btn-sm" onclick="refreshCurrentLogs()">Refresh Logs</button>
+        </div>
+        <div class="code-box" id="detailLogs" style="max-height: 200px;">Loading logs...</div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button class="btn btn-outline" onclick="closeModal('appDetailsModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
