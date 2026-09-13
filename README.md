@@ -34,7 +34,7 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 │  • Serviços Type: LoadBalancer (Acesso via `tunnel`)   │
 │  • Oferta Kafka: Apache Kafka (namespace: `kafka`)     │
 │  • Oferta Observability: Prometheus + Grafana (30080)  │
-│  • Oferta Dados: PostgreSQL e Redis (namespace: `data`)│
+│  • Oferta Dados: PostgreSQL e Redis (namespaces sep.)  │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -46,7 +46,7 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 * ⚡ **Acesso Direto com Minikube Tunnel**: Os serviços são criados como `Type: LoadBalancer`. Com o comando `make tunnel`, a aplicação ganha um IP externo roteável diretamente na sua máquina host (além de manter fallback via NodePort).
 * 🧩 **Catálogo de Ofertas Pré-Integradas (Addons)**:
   * **Apache Kafka**: Provisionamento de broker KRaft, tópico e injeção de `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `KAFKA_CONSUMER_GROUP`, `KAFKA_CLIENT_ID`.
-  * **Observabilidade (Prometheus + Grafana + OTel)**: Scraping automático de métricas (`prometheus.io/scrape`), injeção de endpoints do OpenTelemetry Collector e dashboards pré-configurados no Grafana (`:30080`).
+  * **Observabilidade (Prometheus + Grafana + OTel)**: Stack unificada com checkboxes para instalação individual de cada componente. Scraping automático de métricas (`prometheus.io/scrape`), injeção de endpoints do OpenTelemetry Collector e dashboards pré-configurados no Grafana (`:30080`).
   * **PostgreSQL Relational DB**: Instância PostgreSQL com injeção automática de variáveis padrão de mercado (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_URL` e aliases `DB_*` e `POSTGRES_*`), compatível diretamente com TypeORM, NestJS, Prisma, Spring Boot e Django.
   * **Redis Cache**: In-memory data store com injeção de `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`.
 * 🐳 **Suporte a Docker Registry (Público, Privado e Minikube Local)**:
@@ -152,7 +152,8 @@ Se você já possui uma instância do Backstage em execução:
 | `DELETE`| `/api/v1/apps/:name` | Remove a aplicação e limpa seu namespace dedicado |
 | `GET` | `/api/v1/apps/:name/logs` | Streaming de logs recentes dos pods em tempo real |
 | `GET` | `/api/v1/offers` | Lista ofertas disponíveis e status de instalação no cluster |
-| `POST` | `/api/v1/offers/:id/install` | Instala os componentes de cluster da oferta (Kafka, Prometheus, etc.) |
+| `POST` | `/api/v1/offers/:id/install` | Instala componentes da oferta (aceita body com flags `prometheus`, `grafana`, `otel`) |
+| `GET` | `/api/v1/offers/:id/status` | Retorna status dos componentes instalados (monitoring) |
 | `POST` | `/api/v1/apps/:name/links` | Vincula uma oferta e injeta configurações no pod |
 | `DELETE`| `/api/v1/apps/:name/links/:offerId` | Desvincula a oferta e remove variáveis do pod |
 | `GET` | `/api/v1/registry` | Consulta o status das credenciais do Docker Registry |
@@ -167,4 +168,29 @@ Para rodar a suíte completa de testes unitários:
 
 ```bash
 make test
+```
+
+---
+
+## 📦 Exemplo: Deploy Completo com Observabilidade
+
+```bash
+# 1. Instalar apenas Prometheus
+curl -X POST http://localhost:8080/api/v1/offers/monitoring/install \
+  -H "Content-Type: application/json" \
+  -d '{"prometheus": true, "grafana": false, "otel": false}'
+
+# 2. Adicionar Grafana depois
+curl -X POST http://localhost:8080/api/v1/offers/monitoring/install \
+  -H "Content-Type: application/json" \
+  -d '{"prometheus": false, "grafana": true, "otel": false}'
+
+# 3. Verificar status dos componentes
+curl http://localhost:8080/api/v1/offers/monitoring/status
+# Resposta: {"prometheus":true,"grafana":true,"otel":false}
+
+# 4. Deploy da aplicação com monitoring linkado
+curl -X POST http://localhost:8080/api/v1/apps \
+  -H "Content-Type: application/json" \
+  -d '{"name":"my-app","image":"my-image:latest","port":8080,"offers":["monitoring"]}'
 ```
