@@ -1,7 +1,7 @@
 # NavisPaaS 🚢⚡
 
 > **Developer-Centric Kubernetes PaaS Engine**  
-> Plataforma PaaS simplificada para Kubernetes focada na experiência do desenvolvedor: faça deploy de microsserviços em namespaces dedicados e vincule ofertas de infraestrutura pré-integradas (Apache Kafka, Observabilidade Prometheus/Grafana/OTel, PostgreSQL, Redis) com injeção automática de configurações e zero boilerplate de YAMLs.
+> Plataforma PaaS simplificada para Kubernetes focada na experiência do desenvolvedor: faça deploy de microsserviços em namespaces dedicados e vincule ofertas de infraestrutura pré-integradas (Apache Kafka, RabbitMQ, Observabilidade Prometheus/Grafana/OTel, PostgreSQL, Redis, Kong API Gateway) com injeção automática de configurações e zero boilerplate de YAMLs.
 
 ---
 
@@ -33,8 +33,10 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 │  • Workload Isolado por App (ex: namespace `app-name`) │
 │  • Serviços Type: LoadBalancer (Acesso via `tunnel`)   │
 │  • Oferta Kafka: Apache Kafka (namespace: `kafka`)     │
-│  • Oferta Observability: Prometheus + Grafana + OTel     │
+│  • Oferta RabbitMQ: Message Broker (namespace: `rabbitmq`) │
+│  • Oferta Observability: Prometheus + Grafana + OTel   │
 │  • Oferta Dados: PostgreSQL e Redis (namespaces sep.)  │
+│  • Oferta Networking: Kong API Gateway (namespace: `kong`) │
 └────────────────────────────────────────────────────────┘
 ```
 
@@ -46,9 +48,11 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 * ⚡ **Acesso Direto com Minikube Tunnel**: Os serviços são criados como `Type: LoadBalancer`. Com o comando `make tunnel`, a aplicação ganha um IP externo roteável diretamente na sua máquina host (além de manter fallback via NodePort).
 * 🧩 **Catálogo de Ofertas Pré-Integradas (Addons)**:
   * **Apache Kafka**: Provisionamento de broker KRaft, tópico e injeção de `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `KAFKA_CONSUMER_GROUP`, `KAFKA_CLIENT_ID`.
+  * **RabbitMQ**: Message broker com suporte AMQP, injeção de `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `RABBITMQ_URL`, Management UI na porta `30673`.
   * **Observabilidade (Prometheus + Grafana + OTel)**: Stack unificada com checkboxes para instalação individual de cada componente. Scraping automático de métricas (`prometheus.io/scrape`), injeção de endpoints do OpenTelemetry Collector e dashboards pré-configurados no Grafana (`:30080`).
   * **PostgreSQL Relational DB**: Instância PostgreSQL com injeção automática de variáveis padrão de mercado (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_URL` e aliases `DB_*` e `POSTGRES_*`), compatível diretamente com TypeORM, NestJS, Prisma, Spring Boot e Django.
   * **Redis Cache**: In-memory data store com injeção de `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`.
+  * **Kong API Gateway**: Gateway open-source mais popular do mercado com rate limiting, autenticação via API key, CORS e plugin ecosystem. Proxy na porta `30080`, Admin API na `30001`.
 * 🐳 **Suporte a Docker Registry (Público, Privado e Minikube Local)**:
   * **Docker Hub**: Padrão nativo (`docker.io`) para imagens públicas.
   * **Registries Privados (GHCR, Harbor, ECR, GitLab)**: Gerenciamento de credenciais via UI/API com criação automática de Secret `kubernetes.io/dockerconfigjson` e injeção de `imagePullSecrets`.
