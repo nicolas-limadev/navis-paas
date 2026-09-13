@@ -35,6 +35,8 @@ func NewCatalog(cm *k8s.ClientManager) *Catalog {
 	c.Register(&MonitoringOffer{})
 	c.Register(&RedisOffer{})
 	c.Register(&PostgresOffer{})
+	c.Register(&KongGatewayOffer{})
+	c.Register(&RabbitMQOffer{})
 
 	return c
 }
