@@ -104,7 +104,7 @@ func (h *Handler) CreateApp(c *gin.Context) {
 // GetAppDetails returns full metadata and pod statuses for an app
 func (h *Handler) GetAppDetails(c *gin.Context) {
 	name := c.Param("name")
-	namespace := c.DefaultQuery("namespace", "navis-apps")
+	namespace := c.Query("namespace")
 
 	details, err := h.apps.GetAppDetails(c, namespace, name)
 	if err != nil {
@@ -118,7 +118,7 @@ func (h *Handler) GetAppDetails(c *gin.Context) {
 // DeleteApp removes an application and its associated resources
 func (h *Handler) DeleteApp(c *gin.Context) {
 	name := c.Param("name")
-	namespace := c.DefaultQuery("namespace", "navis-apps")
+	namespace := c.Query("namespace")
 
 	if err := h.apps.DeleteApp(c, namespace, name); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -131,7 +131,7 @@ func (h *Handler) DeleteApp(c *gin.Context) {
 // GetAppLogs returns recent container logs
 func (h *Handler) GetAppLogs(c *gin.Context) {
 	name := c.Param("name")
-	namespace := c.DefaultQuery("namespace", "navis-apps")
+	namespace := c.Query("namespace")
 	lines, _ := strconv.ParseInt(c.DefaultQuery("lines", "100"), 10, 64)
 
 	logs, err := h.apps.GetAppLogs(c, namespace, name, lines)
@@ -163,7 +163,7 @@ func (h *Handler) InstallOffer(c *gin.Context) {
 // LinkOffer binds an offer to a specific application
 func (h *Handler) LinkOffer(c *gin.Context) {
 	name := c.Param("name")
-	namespace := c.DefaultQuery("namespace", "navis-apps")
+	namespace := c.Query("namespace")
 
 	var req LinkOfferRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -197,7 +197,7 @@ func (h *Handler) LinkOffer(c *gin.Context) {
 func (h *Handler) UnlinkOffer(c *gin.Context) {
 	name := c.Param("name")
 	offerID := c.Param("offerId")
-	namespace := c.DefaultQuery("namespace", "navis-apps")
+	namespace := c.Query("namespace")
 
 	app, err := h.apps.GetApp(c, namespace, name)
 	if err != nil {

@@ -118,7 +118,7 @@ func (p *PostgresOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *mo
 	}
 	dbName := params["databaseName"]
 	if dbName == "" {
-		dbName = app.Name + "_db"
+		dbName = "navisdb"
 	}
 	user := params["username"]
 	if user == "" {
@@ -128,12 +128,22 @@ func (p *PostgresOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *mo
 	host := "postgres-service.data.svc.cluster.local"
 
 	injectedEnvs := map[string]string{
-		"DB_HOST":     host,
-		"DB_PORT":     "5432",
-		"DB_NAME":     dbName,
-		"DB_USER":     user,
-		"DB_PASSWORD": pass,
-		"DATABASE_URL": fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, pass, host, dbName),
+		"DATABASE_HOST":     host,
+		"DATABASE_PORT":     "5432",
+		"DATABASE_NAME":     dbName,
+		"DATABASE_USER":     user,
+		"DATABASE_PASSWORD": pass,
+		"DB_HOST":           host,
+		"DB_PORT":           "5432",
+		"DB_NAME":           dbName,
+		"DB_USER":           user,
+		"DB_PASSWORD":       pass,
+		"POSTGRES_HOST":     host,
+		"POSTGRES_PORT":     "5432",
+		"POSTGRES_DB":       dbName,
+		"POSTGRES_USER":     user,
+		"POSTGRES_PASSWORD": pass,
+		"DATABASE_URL":      fmt.Sprintf("postgres://%s:%s@%s:5432/%s?sslmode=disable", user, pass, host, dbName),
 	}
 
 	dep, err := cm.Clientset.AppsV1().Deployments(app.Namespace).Get(ctx, app.Name, metav1.GetOptions{})
@@ -196,7 +206,12 @@ func (p *PostgresOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app *
 	if err != nil {
 		return err
 	}
-	dbKeys := map[string]bool{"DB_HOST": true, "DB_PORT": true, "DB_NAME": true, "DB_USER": true, "DB_PASSWORD": true, "DATABASE_URL": true}
+	dbKeys := map[string]bool{
+		"DATABASE_HOST": true, "DATABASE_PORT": true, "DATABASE_NAME": true, "DATABASE_USER": true, "DATABASE_PASSWORD": true,
+		"DB_HOST": true, "DB_PORT": true, "DB_NAME": true, "DB_USER": true, "DB_PASSWORD": true,
+		"POSTGRES_HOST": true, "POSTGRES_PORT": true, "POSTGRES_DB": true, "POSTGRES_USER": true, "POSTGRES_PASSWORD": true,
+		"DATABASE_URL": true,
+	}
 	if len(dep.Spec.Template.Spec.Containers) > 0 {
 		var filteredEnv []corev1.EnvVar
 		for _, env := range dep.Spec.Template.Spec.Containers[0].Env {

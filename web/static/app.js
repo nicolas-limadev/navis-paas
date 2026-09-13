@@ -106,10 +106,13 @@ function renderApps() {
         </div>
 
         <div class="card-meta">
+          <span>Namespace: <strong style="color:var(--accent-cyan);">${app.namespace}</strong></span>
           <span>Image: <strong>${app.image}</strong></span>
           <span>Target Port: <strong>${app.port}</strong></span>
           <span>Replicas: <strong>${app.readyCount} / ${app.replicas}</strong></span>
+          ${app.accessURL ? `<span>Live URL: <a href="${app.accessURL}" target="_blank" style="color:#38bdf8;text-decoration:underline;">${app.accessURL} ↗</a></span>` : ''}
           ${app.nodePort ? `<span>NodePort: <strong>${app.nodePort}</strong></span>` : ''}
+          ${app.externalIP ? `<span>Tunnel IP: <strong>${app.externalIP}</strong></span>` : ''}
         </div>
 
         <div class="card-offers">
@@ -239,6 +242,7 @@ function closeModal(modalId) {
 async function handleDeployApp(e) {
   e.preventDefault();
   const name = document.getElementById('appName').value.trim();
+  const namespace = document.getElementById('appNamespace').value.trim();
   const image = document.getElementById('appImage').value.trim();
   const port = parseInt(document.getElementById('appPort').value, 10);
   const replicas = parseInt(document.getElementById('appReplicas').value, 10);
@@ -248,10 +252,13 @@ async function handleDeployApp(e) {
   if (document.getElementById('offerCheckKafka').checked) offers.push('kafka');
 
   try {
+    const payload = { name, image, port, replicas, offers };
+    if (namespace) payload.namespace = namespace;
+
     const res = await fetch('/api/v1/apps', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name, image, port, replicas, offers })
+      body: JSON.stringify(payload)
     });
 
     if (!res.ok) {

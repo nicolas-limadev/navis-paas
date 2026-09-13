@@ -49,7 +49,8 @@ func (s *AppService) EnsureNamespace(ctx context.Context, namespace string) erro
 			ObjectMeta: metav1.ObjectMeta{
 				Name: namespace,
 				Labels: map[string]string{
-					LabelManagedBy: ManagedByValue,
+					LabelManagedBy:     ManagedByValue,
+					"navispaas.io/app": namespace,
 				},
 			},
 		}
@@ -64,9 +65,10 @@ func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateApp
 		return nil, fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
 
+	// Default to dedicated per-application namespace
 	namespace := req.Namespace
 	if namespace == "" {
-		namespace = DefaultNamespace
+		namespace = req.Name
 	}
 
 	if err := s.EnsureNamespace(ctx, namespace); err != nil {
@@ -166,7 +168,7 @@ func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateApp
 		return nil, fmt.Errorf("failed to deploy application: %w", err)
 	}
 
-	// Create or update Service (NodePort for Minikube friendliness)
+	// Create or update Service (LoadBalancer: works with 'minikube tunnel' and allocates NodePort)
 	service := &corev1.Service{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      req.Name,
@@ -174,7 +176,7 @@ func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateApp
 			Labels:    labels,
 		},
 		Spec: corev1.ServiceSpec{
-			Type: corev1.ServiceTypeNodePort,
+			Type: corev1.ServiceTypeLoadBalancer,
 			Selector: map[string]string{
 				LabelAppName: req.Name,
 			},
@@ -225,12 +227,25 @@ func (s *AppService) ListApps(ctx context.Context, namespace string) ([]models.A
 	var apps []models.Application
 	for _, dep := range deployments.Items {
 		app := s.convertDeploymentToApp(&dep)
-		// Fetch matching service to grab NodePort & ClusterIP
+		// Fetch matching service to grab NodePort, ClusterIP, LoadBalancer IP
 		svc, err := s.clientManager.Clientset.CoreV1().Services(dep.Namespace).Get(ctx, dep.Name, metav1.GetOptions{})
 		if err == nil {
 			app.ClusterIP = svc.Spec.ClusterIP
 			if len(svc.Spec.Ports) > 0 {
 				app.NodePort = svc.Spec.Ports[0].NodePort
+			}
+			if len(svc.Status.LoadBalancer.Ingress) > 0 {
+				ingress := svc.Status.LoadBalancer.Ingress[0]
+				if ingress.IP != "" {
+					app.ExternalIP = ingress.IP
+					app.AccessURL = fmt.Sprintf("http://%s:%d", ingress.IP, app.Port)
+				} else if ingress.Hostname != "" {
+					app.ExternalIP = ingress.Hostname
+					app.AccessURL = fmt.Sprintf("http://%s:%d", ingress.Hostname, app.Port)
+				}
+			}
+			if app.AccessURL == "" && app.NodePort > 0 {
+				app.AccessURL = fmt.Sprintf("http://192.168.49.2:%d", app.NodePort)
 			}
 		}
 		apps = append(apps, *app)
@@ -249,7 +264,12 @@ func (s *AppService) GetApp(ctx context.Context, namespace, name string) (*model
 		return nil, fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
 	if namespace == "" {
-		namespace = DefaultNamespace
+		// First try dedicated app namespace (matching name)
+		if _, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
+			namespace = name
+		} else {
+			namespace = DefaultNamespace
+		}
 	}
 
 	dep, err := s.clientManager.Clientset.AppsV1().Deployments(namespace).Get(ctx, name, metav1.GetOptions{})
@@ -265,6 +285,19 @@ func (s *AppService) GetApp(ctx context.Context, namespace, name string) (*model
 		app.ClusterIP = svc.Spec.ClusterIP
 		if len(svc.Spec.Ports) > 0 {
 			app.NodePort = svc.Spec.Ports[0].NodePort
+		}
+		if len(svc.Status.LoadBalancer.Ingress) > 0 {
+			ingress := svc.Status.LoadBalancer.Ingress[0]
+			if ingress.IP != "" {
+				app.ExternalIP = ingress.IP
+				app.AccessURL = fmt.Sprintf("http://%s:%d", ingress.IP, app.Port)
+			} else if ingress.Hostname != "" {
+				app.ExternalIP = ingress.Hostname
+				app.AccessURL = fmt.Sprintf("http://%s:%d", ingress.Hostname, app.Port)
+			}
+		}
+		if app.AccessURL == "" && app.NodePort > 0 {
+			app.AccessURL = fmt.Sprintf("http://192.168.49.2:%d", app.NodePort)
 		}
 	}
 
@@ -319,7 +352,11 @@ func (s *AppService) DeleteApp(ctx context.Context, namespace, name string) erro
 		return fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
 	if namespace == "" {
-		namespace = DefaultNamespace
+		if _, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
+			namespace = name
+		} else {
+			namespace = DefaultNamespace
+		}
 	}
 
 	// Delete Deployment
@@ -327,6 +364,11 @@ func (s *AppService) DeleteApp(ctx context.Context, namespace, name string) erro
 
 	// Delete Service
 	_ = s.clientManager.Clientset.CoreV1().Services(namespace).Delete(ctx, name, metav1.DeleteOptions{})
+
+	// If the application was in its own dedicated namespace, remove the namespace cleanly
+	if namespace == name {
+		_ = s.clientManager.Clientset.CoreV1().Namespaces().Delete(ctx, namespace, metav1.DeleteOptions{})
+	}
 
 	return nil
 }
@@ -337,7 +379,11 @@ func (s *AppService) GetAppLogs(ctx context.Context, namespace, name string, tai
 		return "", fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
 	if namespace == "" {
-		namespace = DefaultNamespace
+		if _, err := s.clientManager.Clientset.AppsV1().Deployments(name).Get(ctx, name, metav1.GetOptions{}); err == nil {
+			namespace = name
+		} else {
+			namespace = DefaultNamespace
+		}
 	}
 	if tailLines <= 0 {
 		tailLines = 100

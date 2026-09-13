@@ -13,6 +13,8 @@ type Application struct {
 	Status       string            `json:"status"` // Running, Pending, Degraded, etc.
 	NodePort     int32             `json:"nodePort,omitempty"`
 	ClusterIP    string            `json:"clusterIP,omitempty"`
+	ExternalIP   string            `json:"externalIP,omitempty"`
+	AccessURL    string            `json:"accessURL,omitempty"`
 	EnvVars      map[string]string `json:"envVars,omitempty"`
 	LinkedOffers []LinkedOffer     `json:"linkedOffers"`
 	CreatedAt    time.Time         `json:"createdAt"`
