@@ -81,7 +81,14 @@ func (m *MonitoringOffer) Install(ctx context.Context, cm *k8s.ClientManager) er
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ns,
 				Labels: map[string]string{
-					"navispaas.io/managed-by": "navispaas",
+					"name":                      ns,
+					"app.kubernetes.io/name":    "monitoring",
+					"app.kubernetes.io/part-of": "navispaas",
+					"navispaas.io/managed-by":   "navispaas",
+					"navispaas.io/tier":         "observability",
+				},
+				Annotations: map[string]string{
+					"navispaas.io/description": "Prometheus, Grafana and OpenTelemetry observability stack managed by NavisPaaS",
 				},
 			},
 		}, metav1.CreateOptions{})

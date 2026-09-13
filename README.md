@@ -16,7 +16,7 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 │                   Spotify Backstage                    │
 │            (Developer Portal / Scaffolder)             │
 │   - Catálogo de Serviços & APIs                        │
-│   - Template Self-Service com 1 clique (`make backstage│
+│   - Template Self-Service com 1 clique `make backstage`│
 └──────────────────────────┬─────────────────────────────┘
                            │ REST API / OpenAPI 3.0
 ┌──────────────────────────▼─────────────────────────────┐

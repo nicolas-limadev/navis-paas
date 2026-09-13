@@ -81,7 +81,14 @@ func (k *KafkaOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ns,
 				Labels: map[string]string{
-					"navispaas.io/managed-by": "navispaas",
+					"name":                      ns,
+					"app.kubernetes.io/name":    "kafka",
+					"app.kubernetes.io/part-of": "navispaas",
+					"navispaas.io/managed-by":   "navispaas",
+					"navispaas.io/tier":         "messaging",
+				},
+				Annotations: map[string]string{
+					"navispaas.io/description": "Apache Kafka event streaming platform managed by NavisPaaS",
 				},
 			},
 		}, metav1.CreateOptions{})

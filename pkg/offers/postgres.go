@@ -16,6 +16,10 @@ import (
 	"k8s.io/apimachinery/pkg/util/intstr"
 )
 
+const (
+	PostgresNamespace = "postgres"
+)
+
 type PostgresOffer struct{}
 
 func (p *PostgresOffer) GetDefinition() models.OfferDefinition {
@@ -51,7 +55,13 @@ func (p *PostgresOffer) IsInstalled(ctx context.Context, cm *k8s.ClientManager) 
 	if !cm.Connected {
 		return false, nil
 	}
-	_, err := cm.Clientset.CoreV1().Services("data").Get(ctx, "postgres-service", metav1.GetOptions{})
+	// Check primary postgres namespace
+	_, err := cm.Clientset.CoreV1().Services(PostgresNamespace).Get(ctx, "postgres-service", metav1.GetOptions{})
+	if err == nil {
+		return true, nil
+	}
+	// Fallback to legacy namespace if present
+	_, err = cm.Clientset.CoreV1().Services("data").Get(ctx, "postgres-service", metav1.GetOptions{})
 	return err == nil, nil
 }
 
@@ -59,22 +69,58 @@ func (p *PostgresOffer) Install(ctx context.Context, cm *k8s.ClientManager) erro
 	if !cm.Connected {
 		return fmt.Errorf("kubernetes cluster not connected")
 	}
-	ns := "data"
+	ns := PostgresNamespace
+
+	// 1. Ensure well-described namespace with cloud-native labels and annotations
 	_, err := cm.Clientset.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, _ = cm.Clientset.CoreV1().Namespaces().Create(ctx, &corev1.Namespace{
-			ObjectMeta: metav1.ObjectMeta{Name: ns},
-		}, metav1.CreateOptions{})
+		nsObj := &corev1.Namespace{
+			ObjectMeta: metav1.ObjectMeta{
+				Name: ns,
+				Labels: map[string]string{
+					"name":                      ns,
+					"app.kubernetes.io/name":    "postgresql",
+					"app.kubernetes.io/part-of": "navispaas",
+					"navispaas.io/managed-by":   "navispaas",
+					"navispaas.io/tier":         "database",
+					"navispaas.io/component":    "postgresql",
+				},
+				Annotations: map[string]string{
+					"navispaas.io/description": "PostgreSQL Relational Database Service managed by NavisPaaS",
+				},
+			},
+		}
+		_, err = cm.Clientset.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{})
+		if err != nil {
+			return fmt.Errorf("failed to create postgres namespace: %w", err)
+		}
 	}
 
 	replicas := int32(1)
 	dep := &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{Name: "postgres", Namespace: ns, Labels: map[string]string{"app": "postgres"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "postgres",
+			Namespace: ns,
+			Labels: map[string]string{
+				"app":                       "postgres",
+				"app.kubernetes.io/name":    "postgres",
+				"app.kubernetes.io/part-of": "navispaas",
+				"navispaas.io/managed-by":   "navispaas",
+				"navispaas.io/component":    "database",
+			},
+		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "postgres"}},
 			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "postgres"}},
+				ObjectMeta: metav1.ObjectMeta{
+					Labels: map[string]string{
+						"app":                       "postgres",
+						"app.kubernetes.io/name":    "postgres",
+						"app.kubernetes.io/part-of": "navispaas",
+						"navispaas.io/managed-by":   "navispaas",
+					},
+				},
 				Spec: corev1.PodSpec{
 					Containers: []corev1.Container{
 						{
@@ -98,7 +144,15 @@ func (p *PostgresOffer) Install(ctx context.Context, cm *k8s.ClientManager) erro
 	}
 
 	svc := &corev1.Service{
-		ObjectMeta: metav1.ObjectMeta{Name: "postgres-service", Namespace: ns, Labels: map[string]string{"app": "postgres"}},
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "postgres-service",
+			Namespace: ns,
+			Labels: map[string]string{
+				"app":                       "postgres",
+				"app.kubernetes.io/name":    "postgres",
+				"navispaas.io/managed-by":   "navispaas",
+			},
+		},
 		Spec: corev1.ServiceSpec{
 			Type:     corev1.ServiceTypeClusterIP,
 			Selector: map[string]string{"app": "postgres"},
@@ -125,7 +179,15 @@ func (p *PostgresOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *mo
 		user = "navisuser"
 	}
 	pass := "navispass123"
-	host := "postgres-service.data.svc.cluster.local"
+
+	// Check if postgres service is in dedicated 'postgres' namespace or fallback
+	targetNS := PostgresNamespace
+	if _, err := cm.Clientset.CoreV1().Services(PostgresNamespace).Get(ctx, "postgres-service", metav1.GetOptions{}); err != nil {
+		if _, err := cm.Clientset.CoreV1().Services("data").Get(ctx, "postgres-service", metav1.GetOptions{}); err == nil {
+			targetNS = "data"
+		}
+	}
+	host := fmt.Sprintf("postgres-service.%s.svc.cluster.local", targetNS)
 
 	injectedEnvs := map[string]string{
 		"DATABASE_HOST":     host,
