@@ -338,7 +338,7 @@ func (m *MonitoringOffer) Bind(ctx context.Context, cm *k8s.ClientManager, app *
 		"PROMETHEUS_SCRAPE_PORT":      strconv.Itoa(int(appPort)),
 		"OTEL_SERVICE_NAME":           app.Name,
 		"OTEL_EXPORTER_OTLP_ENDPOINT": "http://otel-collector.monitoring.svc.cluster.local:4317",
-		"GRAFANA_DASHBOARD_URL":       "http://localhost:30080",
+		"GRAFANA_DASHBOARD_URL":       "http://192.168.49.2:30080",
 	}
 
 	if len(dep.Spec.Template.Spec.Containers) > 0 {

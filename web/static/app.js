@@ -110,9 +110,10 @@ function renderApps() {
           <span>Image: <strong>${app.image}</strong></span>
           <span>Target Port: <strong>${app.port}</strong></span>
           <span>Replicas: <strong>${app.readyCount} / ${app.replicas}</strong></span>
-          ${app.accessURL ? `<span>Live URL: <a href="${app.accessURL}" target="_blank" style="color:#38bdf8;text-decoration:underline;">${app.accessURL} ↗</a></span>` : ''}
+          ${app.accessURL ? `<span>Live URL: <a href="${app.accessURL}" target="_blank" style="color:#38bdf8;font-weight:bold;text-decoration:underline;">${app.accessURL} ↗</a></span>` : ''}
           ${app.nodePort ? `<span>NodePort: <strong>${app.nodePort}</strong></span>` : ''}
           ${app.externalIP ? `<span>Tunnel IP: <strong>${app.externalIP}</strong></span>` : ''}
+          ${app.status !== 'Running' ? `<div style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:6px;font-size:0.8rem;color:#f87171;margin-top:6px;">⚠️ Aplicação reiniciando (${app.status}). Verifique se todas as ofertas (ex: banco de dados) foram vinculadas.</div>` : ''}
         </div>
 
         <div class="card-offers">
@@ -165,8 +166,8 @@ function renderOffers() {
             </button>
           `}
           ${offer.id === 'monitoring' && offer.installed ? `
-            <a href="http://localhost:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;">
-              Open Grafana ↗
+            <a href="http://192.168.49.2:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
+              Open Grafana (192.168.49.2:30080) ↗
             </a>
           ` : ''}
         </div>
