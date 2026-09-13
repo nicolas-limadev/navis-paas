@@ -47,13 +47,13 @@ func (r *RedisOffer) IsInstalled(ctx context.Context, cm *k8s.ClientManager) (bo
 	if !cm.Connected {
 		return false, nil
 	}
-	// Check primary redis namespace
-	_, err := cm.Clientset.CoreV1().Services(RedisNamespace).Get(ctx, "redis-service", metav1.GetOptions{})
+	// Check primary redis deployment
+	_, err := cm.Clientset.AppsV1().Deployments(RedisNamespace).Get(ctx, "redis", metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}
 	// Fallback to legacy namespace if present
-	_, err = cm.Clientset.CoreV1().Services("data").Get(ctx, "redis-service", metav1.GetOptions{})
+	_, err = cm.Clientset.AppsV1().Deployments("data").Get(ctx, "redis", metav1.GetOptions{})
 	return err == nil, nil
 }
 

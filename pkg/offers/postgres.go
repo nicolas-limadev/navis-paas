@@ -55,13 +55,13 @@ func (p *PostgresOffer) IsInstalled(ctx context.Context, cm *k8s.ClientManager) 
 	if !cm.Connected {
 		return false, nil
 	}
-	// Check primary postgres namespace
-	_, err := cm.Clientset.CoreV1().Services(PostgresNamespace).Get(ctx, "postgres-service", metav1.GetOptions{})
+	// Check primary postgres deployment
+	_, err := cm.Clientset.AppsV1().Deployments(PostgresNamespace).Get(ctx, "postgres", metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}
 	// Fallback to legacy namespace if present
-	_, err = cm.Clientset.CoreV1().Services("data").Get(ctx, "postgres-service", metav1.GetOptions{})
+	_, err = cm.Clientset.AppsV1().Deployments("data").Get(ctx, "postgres", metav1.GetOptions{})
 	return err == nil, nil
 }
 

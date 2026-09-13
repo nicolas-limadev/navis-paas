@@ -59,8 +59,8 @@ func (k *KafkaOffer) IsInstalled(ctx context.Context, cm *k8s.ClientManager) (bo
 	if !cm.Connected {
 		return false, nil
 	}
-	// Check if kafka namespace and service exist
-	_, err := cm.Clientset.CoreV1().Services("kafka").Get(ctx, "kafka-service", metav1.GetOptions{})
+	// Check if kafka deployment exists
+	_, err := cm.Clientset.AppsV1().Deployments("kafka").Get(ctx, "kafka-broker", metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}

@@ -60,7 +60,7 @@ func (m *MonitoringOffer) IsInstalled(ctx context.Context, cm *k8s.ClientManager
 	if !cm.Connected {
 		return false, nil
 	}
-	_, err := cm.Clientset.CoreV1().Services("monitoring").Get(ctx, "prometheus-service", metav1.GetOptions{})
+	_, err := cm.Clientset.AppsV1().Deployments("monitoring").Get(ctx, "prometheus", metav1.GetOptions{})
 	if err == nil {
 		return true, nil
 	}
