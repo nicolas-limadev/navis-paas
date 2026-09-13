@@ -132,13 +132,40 @@ func (m *mockClusterChecker) CheckStatus(c *gin.Context) models.ClusterStatus {
 	}
 }
 
+type mockRegistryProvider struct {
+	config models.RegistryConfig
+}
+
+func (m *mockRegistryProvider) GetRegistryStatus(c *gin.Context) models.RegistryStatusResponse {
+	return models.RegistryStatusResponse{
+		Server:        m.config.Server,
+		Username:      m.config.Username,
+		HasPassword:   m.config.Password != "",
+		DefaultPrefix: m.config.DefaultPrefix,
+		Enabled:       m.config.Enabled,
+		SecretName:    "navis-registry-secret",
+	}
+}
+
+func (m *mockRegistryProvider) SaveRegistryConfig(c *gin.Context, cfg models.RegistryConfig) error {
+	m.config = cfg
+	return nil
+}
+
 func setupTestRouter() *gin.Engine {
 	gin.SetMode(gin.TestMode)
 	appSvc := newMockAppService()
 	offerSvc := newMockOfferService()
 	clusterChecker := &mockClusterChecker{}
+	regProvider := &mockRegistryProvider{
+		config: models.RegistryConfig{
+			Server:   "ghcr.io",
+			Username: "orguser",
+			Enabled:  true,
+		},
+	}
 
-	h := NewHandler(appSvc, offerSvc, clusterChecker)
+	h := NewHandler(appSvc, offerSvc, clusterChecker, regProvider)
 	return SetupRouter(h, "")
 }
 
@@ -243,5 +270,43 @@ func TestOpenAPISpecEndpoint(t *testing.T) {
 
 	if spec["openapi"] != "3.0.0" {
 		t.Errorf("expected openapi 3.0.0, got %v", spec["openapi"])
+	}
+}
+
+func TestRegistryEndpoints(t *testing.T) {
+	router := setupTestRouter()
+
+	// 1. GET /api/v1/registry
+	req, _ := http.NewRequest("GET", "/api/v1/registry", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+
+	var status models.RegistryStatusResponse
+	_ = json.Unmarshal(w.Body.Bytes(), &status)
+	if status.Server != "ghcr.io" {
+		t.Errorf("expected server 'ghcr.io', got '%s'", status.Server)
+	}
+
+	// 2. POST /api/v1/registry
+	payload := models.RegistryConfig{
+		Server:        "docker.io",
+		Username:      "dockeruser",
+		Password:      "secrettoken",
+		DefaultPrefix: "docker.io/myteam",
+		Enabled:       true,
+	}
+	body, _ := json.Marshal(payload)
+
+	reqPost, _ := http.NewRequest("POST", "/api/v1/registry", bytes.NewBuffer(body))
+	reqPost.Header.Set("Content-Type", "application/json")
+	wPost := httptest.NewRecorder()
+	router.ServeHTTP(wPost, reqPost)
+
+	if wPost.Code != http.StatusOK {
+		t.Fatalf("expected status 200 on update registry, got %d: %s", wPost.Code, wPost.Body.String())
 	}
 }

@@ -34,7 +34,8 @@ type CreateAppRequest struct {
 	Port      int32             `json:"port" binding:"required"`
 	Replicas  int32             `json:"replicas,omitempty"` // defaults to 1
 	EnvVars   map[string]string `json:"envVars,omitempty"`
-	Offers    []string          `json:"offers,omitempty"` // optional list of offers to auto-bind
+	Offers             []string          `json:"offers,omitempty"` // optional list of offers to auto-bind
+	UsePrivateRegistry *bool             `json:"usePrivateRegistry,omitempty"`
 }
 
 // UpdateAppRequest payload for updating an existing application
@@ -97,4 +98,27 @@ type ClusterStatus struct {
 	ServerURL      string `json:"serverUrl,omitempty"`
 	MinikubeActive bool   `json:"minikubeActive"`
 	ErrorMessage   string `json:"errorMessage,omitempty"`
+}
+
+// RegistryConfig holds private registry authentication and configuration
+type RegistryConfig struct {
+	Server        string    `json:"server"`        // e.g. "ghcr.io", "docker.io", "registry.gitlab.com"
+	Username      string    `json:"username"`      // username or token
+	Password      string    `json:"password"`      // token or password
+	Email         string    `json:"email,omitempty"`
+	DefaultPrefix string    `json:"defaultPrefix"` // optional prefix to auto-prepend, e.g. "ghcr.io/myorg"
+	Enabled       bool      `json:"enabled"`
+	SecretName    string    `json:"secretName"`    // default: "navis-registry-secret"
+	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+// RegistryStatusResponse returns safe (masked) registry information to the frontend
+type RegistryStatusResponse struct {
+	Server        string    `json:"server"`
+	Username      string    `json:"username"`
+	HasPassword   bool      `json:"hasPassword"`
+	DefaultPrefix string    `json:"defaultPrefix"`
+	Enabled       bool      `json:"enabled"`
+	SecretName    string    `json:"secretName"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }

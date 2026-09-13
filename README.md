@@ -78,6 +78,27 @@ O NavisPaaS foi desenhado para ser acoplado diretamente ao Backstage:
 
 ---
 
+## 🐳 Suporte a Docker Registry (Público, Privado e Minikube Local)
+
+O **NavisPaaS** gerencia automaticamente a resolução e o download de imagens:
+
+1. **Registries Privados (GHCR, Docker Hub, ECR, Harbor)**:
+   * Configure suas credenciais via Dashboard (botão `🔐 Registry`) ou via API `POST /api/v1/registry`.
+   * O NavisPaaS cria automaticamente o Secret do tipo `kubernetes.io/dockerconfigjson` (`navis-registry-secret`) e injeta o `imagePullSecrets` em todos os pods.
+
+2. **Prefixo Padrão (Default Prefix)**:
+   * Ao configurar um prefixo (ex: `ghcr.io/minha-empresa`), o desenvolvedor pode informar apenas `order-service:v1.0` que o NavisPaaS expande para `ghcr.io/minha-empresa/order-service:v1.0`.
+
+3. **Minikube Local (Sem push remoto)**:
+   * Basta apontar o terminal local para o daemon do Minikube antes de gerar o build:
+     ```bash
+     eval $(minikube docker-env)
+     docker build -t minha-app:latest .
+     ```
+   * O NavisPaaS usa `imagePullPolicy: IfNotPresent`, aproveitando imediatamente a imagem local do Minikube sem erro de pull!
+
+---
+
 ## 📡 Referência Rápida da API REST
 
 | Método | Endpoint | Descrição |
@@ -92,6 +113,8 @@ O NavisPaaS foi desenhado para ser acoplado diretamente ao Backstage:
 | `POST` | `/api/v1/offers/:id/install` | Instala a stack da oferta no cluster Minikube |
 | `POST` | `/api/v1/apps/:name/links` | Linka uma oferta à aplicação |
 | `DELETE`| `/api/v1/apps/:name/links/:offerId` | Deslinka uma oferta da aplicação |
+| `GET` | `/api/v1/registry` | Status e configuração do Docker Registry |
+| `POST` | `/api/v1/registry` | Salva credenciais e sincroniza secret no Kubernetes |
 
 ---
 

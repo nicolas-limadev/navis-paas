@@ -109,3 +109,19 @@ func (ca *ClusterAdapter) CheckStatus(c *gin.Context) ClusterStatus {
 		ErrorMessage:   errMsg,
 	}
 }
+
+type RegistryAdapter struct {
+	svc *k8s.RegistryService
+}
+
+func NewRegistryAdapter(svc *k8s.RegistryService) *RegistryAdapter {
+	return &RegistryAdapter{svc: svc}
+}
+
+func (ra *RegistryAdapter) GetRegistryStatus(c *gin.Context) RegistryStatusResponse {
+	return ra.svc.GetStatus()
+}
+
+func (ra *RegistryAdapter) SaveRegistryConfig(c *gin.Context, cfg RegistryConfig) error {
+	return ra.svc.SaveConfig(c.Request.Context(), cfg)
+}

@@ -27,11 +27,15 @@ const (
 )
 
 type AppService struct {
-	clientManager *ClientManager
+	clientManager   *ClientManager
+	registryService *RegistryService
 }
 
-func NewAppService(cm *ClientManager) *AppService {
-	return &AppService{clientManager: cm}
+func NewAppService(cm *ClientManager, regSvc *RegistryService) *AppService {
+	return &AppService{
+		clientManager:   cm,
+		registryService: regSvc,
+	}
 }
 
 // EnsureNamespace ensures the designated namespace exists
@@ -106,6 +110,14 @@ func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateApp
 		AnnotationOffers: string(offersBytes),
 	}
 
+	image := req.Image
+	var imagePullSecrets []corev1.LocalObjectReference
+	if s.registryService != nil {
+		image = s.registryService.ResolveImage(req.Image)
+		_ = s.registryService.EnsureRegistrySecret(ctx, namespace)
+		imagePullSecrets = s.registryService.GetImagePullSecrets()
+	}
+
 	deployment := &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:        req.Name,
@@ -125,10 +137,12 @@ func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateApp
 					Labels: labels,
 				},
 				Spec: corev1.PodSpec{
+					ImagePullSecrets: imagePullSecrets,
 					Containers: []corev1.Container{
 						{
-							Name:  req.Name,
-							Image: req.Image,
+							Name:            req.Name,
+							Image:           image,
+							ImagePullPolicy: corev1.PullIfNotPresent,
 							Ports: []corev1.ContainerPort{
 								{
 									Name:          "http",

@@ -57,6 +57,10 @@ func SetupRouter(h *Handler, staticDir string) *gin.Engine {
 		v1.POST("/apps/:name/links", h.LinkOffer)
 		v1.DELETE("/apps/:name/links/:offerId", h.UnlinkOffer)
 
+		// Registry Management
+		v1.GET("/registry", h.GetRegistry)
+		v1.POST("/registry", h.UpdateRegistry)
+
 		// OpenAPI Spec endpoint for Backstage / Swagger
 		v1.GET("/openapi.json", func(c *gin.Context) {
 			c.JSON(http.StatusOK, getOpenAPISpec())
@@ -100,6 +104,10 @@ func getOpenAPISpec() gin.H {
 			},
 			"/api/v1/apps/{name}/links/{offerId}": gin.H{
 				"delete": gin.H{"summary": "Unlink an offer from an application"},
+			},
+			"/api/v1/registry": gin.H{
+				"get":  gin.H{"summary": "Get private Docker registry configuration status"},
+				"post": gin.H{"summary": "Update private Docker registry credentials and sync secrets"},
 			},
 		},
 	}

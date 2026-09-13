@@ -31,17 +31,25 @@ type ClusterChecker interface {
 	CheckStatus(ctx *gin.Context) ClusterStatus
 }
 
-type Handler struct {
-	apps    AppServiceProvider
-	offers  OfferServiceProvider
-	cluster ClusterChecker
+// RegistryProvider manages private container registries
+type RegistryProvider interface {
+	GetRegistryStatus(ctx *gin.Context) RegistryStatusResponse
+	SaveRegistryConfig(ctx *gin.Context, cfg RegistryConfig) error
 }
 
-func NewHandler(apps AppServiceProvider, offers OfferServiceProvider, cluster ClusterChecker) *Handler {
+type Handler struct {
+	apps     AppServiceProvider
+	offers   OfferServiceProvider
+	cluster  ClusterChecker
+	registry RegistryProvider
+}
+
+func NewHandler(apps AppServiceProvider, offers OfferServiceProvider, cluster ClusterChecker, registry RegistryProvider) *Handler {
 	return &Handler{
-		apps:    apps,
-		offers:  offers,
-		cluster: cluster,
+		apps:     apps,
+		offers:   offers,
+		cluster:  cluster,
+		registry: registry,
 	}
 }
 
@@ -208,5 +216,31 @@ func (h *Handler) UnlinkOffer(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"message":     fmt.Sprintf("offer '%s' unlinked from '%s'", offerID, name),
 		"application": updatedApp,
+	})
+}
+
+// GetRegistry returns the current private registry configuration status
+func (h *Handler) GetRegistry(c *gin.Context) {
+	status := h.registry.GetRegistryStatus(c)
+	c.JSON(http.StatusOK, status)
+}
+
+// UpdateRegistry configures private registry credentials and synchronizes secrets
+func (h *Handler) UpdateRegistry(c *gin.Context) {
+	var cfg RegistryConfig
+	if err := c.ShouldBindJSON(&cfg); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload: " + err.Error()})
+		return
+	}
+
+	if err := h.registry.SaveRegistryConfig(c, cfg); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to save registry config: " + err.Error()})
+		return
+	}
+
+	status := h.registry.GetRegistryStatus(c)
+	c.JSON(http.StatusOK, gin.H{
+		"message":  "registry configuration saved successfully",
+		"registry": status,
 	})
 }

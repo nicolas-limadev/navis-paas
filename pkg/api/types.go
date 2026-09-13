@@ -12,3 +12,5 @@ type OfferDefinition = models.OfferDefinition
 type OfferParameter = models.OfferParameter
 type LinkOfferRequest = models.LinkOfferRequest
 type ClusterStatus = models.ClusterStatus
+type RegistryConfig = models.RegistryConfig
+type RegistryStatusResponse = models.RegistryStatusResponse

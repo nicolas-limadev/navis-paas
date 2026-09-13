@@ -22,6 +22,9 @@
         <span class="status-dot" id="statusDot"></span>
         <span id="clusterStatusText">Connecting...</span>
       </div>
+      <button class="btn btn-outline" onclick="openRegistryModal()" title="Configure Docker Registry & Secrets">
+        🔐 Registry
+      </button>
       <button class="btn btn-primary" onclick="openDeployModal()">
         <span>+</span> Deploy Application
       </button>
@@ -178,6 +181,59 @@
       <div style="display: flex; justify-content: flex-end;">
         <button class="btn btn-outline" onclick="closeModal('appDetailsModal')">Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Private Registry Modal -->
+  <div class="modal-backdrop" id="registryModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>Docker Registry Settings</h2>
+        <button class="modal-close" onclick="closeModal('registryModal')">&times;</button>
+      </div>
+      <form id="registryForm" onsubmit="handleSaveRegistry(event)">
+        <div class="form-group">
+          <label class="form-checkbox">
+            <input type="checkbox" id="regEnabled">
+            <span><strong>Enable Private Registry Authentication</strong></span>
+          </label>
+        </div>
+
+        <div class="form-group">
+          <label>Registry Server</label>
+          <input type="text" id="regServer" class="form-control" placeholder="e.g. ghcr.io, docker.io, registry.gitlab.com" value="ghcr.io">
+        </div>
+
+        <div class="form-group">
+          <label>Username / Robot Account</label>
+          <input type="text" id="regUsername" class="form-control" placeholder="e.g. github-username or robot$org">
+        </div>
+
+        <div class="form-group">
+          <label>Password / Access Token (PAT)</label>
+          <input type="password" id="regPassword" class="form-control" placeholder="Leave empty to keep existing password">
+        </div>
+
+        <div class="form-group">
+          <label>Email (Optional)</label>
+          <input type="email" id="regEmail" class="form-control" placeholder="dev@company.com">
+        </div>
+
+        <div class="form-group">
+          <label>Default Registry Prefix (Optional)</label>
+          <input type="text" id="regDefaultPrefix" class="form-control" placeholder="e.g. ghcr.io/my-org">
+          <small style="color:#64748b;font-size:0.75rem;">When defined, entering 'api:v1' automatically becomes 'ghcr.io/my-org/api:v1'.</small>
+        </div>
+
+        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 0.85rem; font-size: 0.8rem; color: #93c5fd; margin-bottom: 1.5rem;">
+          💡 <strong>Minikube Tip:</strong> For local images without pushing to any remote registry, run <code>eval $(minikube docker-env)</code> before building your Docker image. NavisPaaS configures <code>imagePullPolicy: IfNotPresent</code> so local Minikube images are used instantly.
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('registryModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save & Sync Secret</button>
+        </div>
+      </form>
     </div>
   </div>
 

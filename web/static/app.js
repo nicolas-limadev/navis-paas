@@ -4,6 +4,7 @@ let state = {
   apps: [],
   offers: [],
   cluster: {},
+  registry: {},
   currentDetailApp: null
 };
 
@@ -12,6 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
   fetchClusterHealth();
   fetchApps();
   fetchOffers();
+  fetchRegistry();
   loadBackstageTemplate();
 
   // Poll cluster health every 10s
@@ -170,8 +172,63 @@ function renderOffers() {
   }).join('');
 }
 
+async function fetchRegistry() {
+  try {
+    const res = await fetch('/api/v1/registry');
+    const data = await res.json();
+    state.registry = data;
+  } catch (err) {
+    console.error('Failed to fetch registry config:', err);
+  }
+}
+
+function openRegistryModal() {
+  const reg = state.registry || {};
+  document.getElementById('regEnabled').checked = !!reg.enabled;
+  document.getElementById('regServer').value = reg.server || 'ghcr.io';
+  document.getElementById('regUsername').value = reg.username || '';
+  document.getElementById('regPassword').value = '';
+  document.getElementById('regDefaultPrefix').value = reg.defaultPrefix || '';
+  document.getElementById('registryModal').classList.add('open');
+}
+
+async function handleSaveRegistry(e) {
+  e.preventDefault();
+  const enabled = document.getElementById('regEnabled').checked;
+  const server = document.getElementById('regServer').value.trim();
+  const username = document.getElementById('regUsername').value.trim();
+  const password = document.getElementById('regPassword').value.trim();
+  const email = document.getElementById('regEmail').value.trim();
+  const defaultPrefix = document.getElementById('regDefaultPrefix').value.trim();
+
+  try {
+    const res = await fetch('/api/v1/registry', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ enabled, server, username, password, email, defaultPrefix })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Failed to save registry: ' + (err.error || res.statusText));
+      return;
+    }
+
+    const data = await res.json();
+    state.registry = data.registry;
+    alert('Registry settings saved and synchronized to Kubernetes!');
+    closeModal('registryModal');
+  } catch (err) {
+    alert('Error saving registry: ' + err.message);
+  }
+}
+
 // Modal Handlers
 function openDeployModal() {
+  // If a default prefix is configured, show a helper hint in placeholder
+  if (state.registry && state.registry.enabled && state.registry.defaultPrefix) {
+    document.getElementById('appImage').placeholder = `e.g. order-service:v1 (auto-prepended with ${state.registry.defaultPrefix}/)`;
+  }
   document.getElementById('deployModal').classList.add('open');
 }
 

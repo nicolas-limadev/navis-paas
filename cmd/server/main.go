@@ -39,14 +39,16 @@ func main() {
 	}
 
 	// Initialize Core Services
-	appService := k8s.NewAppService(cm)
+	registryService := k8s.NewRegistryService(cm)
+	appService := k8s.NewAppService(cm, registryService)
 	catalog := offers.NewCatalog(cm)
 
 	// Create API Adapters & Handlers
 	appAdapter := api.NewAppAdapter(appService)
 	offerAdapter := api.NewOfferAdapter(catalog, cm)
 	clusterAdapter := api.NewClusterAdapter(cm)
-	handler := api.NewHandler(appAdapter, offerAdapter, clusterAdapter)
+	registryAdapter := api.NewRegistryAdapter(registryService)
+	handler := api.NewHandler(appAdapter, offerAdapter, clusterAdapter, registryAdapter)
 
 	// Locate static directory for UI
 	cwd, _ := os.Getwd()
