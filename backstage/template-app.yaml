@@ -54,13 +54,8 @@ spec:
           default: true
 
   steps:
-    - id: deploy-navispaas
-      name: Deploying on NavisPaaS Kubernetes Engine
-      action: fetch:plain
-      input:
-        targetPath: ./manifests
     - id: trigger-navis-api
-      name: Register Application on NavisPaaS API
+      name: Deploy Service to Kubernetes via NavisPaaS
       action: http:backstage:request
       input:
         method: POST

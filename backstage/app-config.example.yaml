@@ -1,0 +1,18 @@
+# Snippet para adicionar no seu app-config.yaml do Backstage
+
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location, Template]
+  locations:
+    # 1. Registra o serviço e a API OpenAPI do NavisPaaS no catálogo do Backstage
+    - type: file
+      target: /home/nicolas/projects-github/navispaas/backstage/catalog-info.yaml
+
+    # 2. Registra o Template de criação de microsserviços (Scaffolder)
+    - type: file
+      target: /home/nicolas/projects-github/navispaas/backstage/template-app.yaml
+
+# Permite chamadas HTTP do Scaffolder para a API do NavisPaaS
+backend:
+  csp:
+    connect-src: ["'self'", 'http:', 'https:']
