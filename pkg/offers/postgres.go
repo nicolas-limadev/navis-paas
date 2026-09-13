@@ -274,6 +274,25 @@ func (p *PostgresOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app *
 		"POSTGRES_HOST": true, "POSTGRES_PORT": true, "POSTGRES_DB": true, "POSTGRES_USER": true, "POSTGRES_PASSWORD": true,
 		"DATABASE_URL": true,
 	}
+
+	// Read and extract all keys dynamically from linked offer config
+	var linkedOffers []models.LinkedOffer
+	var filteredOffers []models.LinkedOffer
+	if dep.Annotations != nil && dep.Annotations[k8s.AnnotationOffers] != "" {
+		_ = json.Unmarshal([]byte(dep.Annotations[k8s.AnnotationOffers]), &linkedOffers)
+		for _, o := range linkedOffers {
+			if o.OfferID == "postgresql" {
+				for k := range o.Config {
+					dbKeys[k] = true
+				}
+			} else {
+				filteredOffers = append(filteredOffers, o)
+			}
+		}
+		bytes, _ := json.Marshal(filteredOffers)
+		dep.Annotations[k8s.AnnotationOffers] = string(bytes)
+	}
+
 	if len(dep.Spec.Template.Spec.Containers) > 0 {
 		var filteredEnv []corev1.EnvVar
 		for _, env := range dep.Spec.Template.Spec.Containers[0].Env {
@@ -283,18 +302,7 @@ func (p *PostgresOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app *
 		}
 		dep.Spec.Template.Spec.Containers[0].Env = filteredEnv
 	}
-	var linkedOffers []models.LinkedOffer
-	if dep.Annotations != nil && dep.Annotations[k8s.AnnotationOffers] != "" {
-		_ = json.Unmarshal([]byte(dep.Annotations[k8s.AnnotationOffers]), &linkedOffers)
-		var filteredOffers []models.LinkedOffer
-		for _, o := range linkedOffers {
-			if o.OfferID != "postgresql" {
-				filteredOffers = append(filteredOffers, o)
-			}
-		}
-		bytes, _ := json.Marshal(filteredOffers)
-		dep.Annotations[k8s.AnnotationOffers] = string(bytes)
-	}
+
 	_, err = cm.Clientset.AppsV1().Deployments(app.Namespace).Update(ctx, dep, metav1.UpdateOptions{})
 	return err
 }
