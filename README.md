@@ -65,11 +65,16 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 
 ### 1. Pré-requisitos
 * Go >= 1.24
-* Kubectl instalado
-* Docker
-* Um dos provedores Kubernetes: Minikube, k3d, Kind, Docker Desktop, Rancher Desktop ou MicroK8s
+* Docker instalado (Altamente recomendado)
+* Um dos provedores Kubernetes (ou use nosso instalador automático abaixo)
 
-### 2. Iniciar o Cluster (escolha um)
+> 💡 **Não tem nenhum cluster Kubernetes instalado?**  
+> Nós criamos um script que baixa e configura o **Minikube** e o **Kubectl** automaticamente para você:
+> ```bash
+> make install-k8s
+> ```
+
+### 2. Iniciar o Cluster (escolha um caso já tenha instalado)
 
 #### Minikube (Recomendado para desenvolvimento local)
 ```bash
@@ -129,6 +134,7 @@ Acesse:
 | `make build` | Compila o binário do servidor em `bin/navispaas` |
 | `make build-cli` | Compila o CLI em `bin/navis` |
 | `make run` | Compila e inicia o servidor do NavisPaaS na porta 8080 |
+| `make install-k8s` | Instala e configura automaticamente o **Minikube** + **Kubectl** |
 | `make minikube-start` | Inicia o Minikube local com perfil recomendado |
 | `make k3d-start` | Inicia cluster k3d (K3s em Docker) |
 | `make kind-start` | Inicia cluster Kind (Kubernetes em Docker) |

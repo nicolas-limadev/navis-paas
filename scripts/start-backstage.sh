@@ -11,7 +11,7 @@ if [ -s "$NVM_DIR/nvm.sh" ]; then
   nvm use v20.17.0 2>/dev/null || nvm use default 2>/dev/null || true
 fi
 
-BACKSTAGE_DIR="$HOME/projects-github/backstage-portal"
+BACKSTAGE_DIR="$HOME/backstage-portal"
 NAVIS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 # Check if Backstage portal already exists
@@ -24,7 +24,9 @@ if [ ! -d "$BACKSTAGE_DIR" ]; then
     npm install -g yarn
   fi
 
-  cd "$HOME/projects-github"
+  PARENT_DIR="$(dirname "$BACKSTAGE_DIR")"
+  mkdir -p "$PARENT_DIR"
+  cd "$PARENT_DIR"
   echo "Creating Backstage application (this may take a couple of minutes)..."
   npx @backstage/create-app@latest --skip-install backstage-portal
   

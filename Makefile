@@ -1,4 +1,4 @@
-.PHONY: build build-cli test run clean minikube-start k3d-start kind-start tunnel backstage
+.PHONY: build build-cli test run clean minikube-start k3d-start kind-start tunnel backstage install-k8s
 
 BINARY_NAME=bin/navispaas
 CLI_BINARY=bin/navis
@@ -18,6 +18,9 @@ run: build
 # Minikube
 minikube-start:
 	minikube start --driver=docker --cpus=2 --memory=4096
+
+install-k8s:
+	@./scripts/install-k8s.sh
 
 tunnel:
 	@echo "Opening Minikube Tunnel for LoadBalancer services..."
