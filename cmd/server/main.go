@@ -7,9 +7,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"navispaas/pkg/api"
-	"navispaas/pkg/k8s"
-	"navispaas/pkg/offers"
+	"github.com/nicolas-limadev/navis-paas/pkg/api"
+	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
+	"github.com/nicolas-limadev/navis-paas/pkg/offers"
 )
 
 func main() {

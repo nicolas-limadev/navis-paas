@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"navispaas/pkg/models"
+	"github.com/nicolas-limadev/navis-paas/pkg/models"
 
 	"github.com/gin-gonic/gin"
 )

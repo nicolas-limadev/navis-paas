@@ -9,7 +9,7 @@ import (
 	"sort"
 	"time"
 
-	"navispaas/pkg/models"
+	"github.com/nicolas-limadev/navis-paas/pkg/models"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"

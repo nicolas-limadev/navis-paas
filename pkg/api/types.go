@@ -1,6 +1,6 @@
 package api
 
-import "navispaas/pkg/models"
+import "github.com/nicolas-limadev/navis-paas/pkg/models"
 
 type Application = models.Application
 type LinkedOffer = models.LinkedOffer

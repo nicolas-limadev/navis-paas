@@ -3,8 +3,8 @@ package api
 import (
 	"context"
 
-	"navispaas/pkg/k8s"
-	"navispaas/pkg/offers"
+	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
+	"github.com/nicolas-limadev/navis-paas/pkg/offers"
 
 	"github.com/gin-gonic/gin"
 )

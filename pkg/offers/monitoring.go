@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"time"
 
-	"navispaas/pkg/models"
-	"navispaas/pkg/k8s"
+	"github.com/nicolas-limadev/navis-paas/pkg/models"
+	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -32,6 +32,14 @@ func (m *MonitoringOffer) GetDefinition() models.OfferDefinition {
 		Version:     "2.54.0",
 		Icon:        "monitoring",
 		Parameters: []models.OfferParameter{
+			{
+				Key:         "metricsPath",
+				Label:       "Metrics Path",
+				Type:        "string",
+				Default:     "/metrics",
+				Description: "Path where your application exposes prometheus metrics",
+				Required:    false,
+			},
 			{
 				Key:         "scrapeInterval",
 				Label:       "Scrape Interval",

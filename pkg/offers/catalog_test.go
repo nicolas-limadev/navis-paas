@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"navispaas/pkg/k8s"
+	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
 )
 
 func TestCatalogOffersRegistration(t *testing.T) {

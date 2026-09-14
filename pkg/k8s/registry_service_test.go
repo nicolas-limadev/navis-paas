@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"navispaas/pkg/models"
+	"github.com/nicolas-limadev/navis-paas/pkg/models"
 )
 
 func TestRegistryServiceResolveImage(t *testing.T) {

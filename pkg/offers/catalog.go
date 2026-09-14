@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"sync"
 
-	"navispaas/pkg/models"
-	"navispaas/pkg/k8s"
+	"github.com/nicolas-limadev/navis-paas/pkg/models"
+	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
 )
 
 // OfferHandler defines the contract for any addon/offer in NavisPaaS

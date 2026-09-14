@@ -1,4 +1,4 @@
-module navispaas
+module github.com/nicolas-limadev/navis-paas
 
 go 1.24.3
 
