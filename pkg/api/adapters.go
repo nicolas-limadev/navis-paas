@@ -107,6 +107,14 @@ func (o *OfferAdapter) UnbindOffer(c *gin.Context, app *Application, offerID str
 	return handler.Unbind(c.Request.Context(), o.cm, app)
 }
 
+func (o *OfferAdapter) CreateCustomOffer(c *gin.Context, def offers.DynamicOfferDefinition) error {
+	return o.catalog.AddCustomOffer(def)
+}
+
+func (o *OfferAdapter) DeleteCustomOffer(c *gin.Context, id string) error {
+	return o.catalog.RemoveCustomOffer(id)
+}
+
 type ClusterAdapter struct {
 	cm *k8s.ClientManager
 }
@@ -160,6 +168,18 @@ func (ca *ClusterAdapter) CheckStatus(c *gin.Context) ClusterStatus {
 		ProviderInfo:   providerInfo,
 		ErrorMessage:   errMsg,
 	}
+}
+
+func (ca *ClusterAdapter) GetClusterContexts(c *gin.Context) ([]string, string, error) {
+	return ca.cm.GetAvailableContexts()
+}
+
+func (ca *ClusterAdapter) SwitchClusterContext(c *gin.Context, contextName string) error {
+	return ca.cm.ConnectWithContext(contextName)
+}
+
+func (ca *ClusterAdapter) SetClusterKubeconfig(c *gin.Context, rawKubeconfig []byte, contextName string) error {
+	return ca.cm.SetKubeconfigContent(rawKubeconfig, contextName)
 }
 
 type RegistryAdapter struct {

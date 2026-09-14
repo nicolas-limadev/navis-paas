@@ -61,6 +61,9 @@ func SetupRouter(h *Handler, staticDir string) *gin.Engine {
 	{
 		// Cluster Health & Info
 		v1.GET("/health", h.GetHealth)
+		v1.GET("/cluster/contexts", h.GetClusterContexts)
+		v1.POST("/cluster/context", h.SwitchClusterContext)
+		v1.POST("/cluster/kubeconfig", h.SetClusterKubeconfig)
 
 		// Applications Management
 		v1.GET("/apps", h.ListApps)
@@ -73,6 +76,8 @@ func SetupRouter(h *Handler, staticDir string) *gin.Engine {
 		v1.GET("/offers", h.ListOffers)
 		v1.POST("/offers/:id/install", h.InstallOffer)
 		v1.GET("/offers/:id/status", h.GetOfferStatus)
+		v1.POST("/offers/custom", h.CreateCustomOffer)
+		v1.DELETE("/offers/custom/:id", h.DeleteCustomOffer)
 
 		// Service Binding
 		v1.POST("/apps/:name/links", h.LinkOffer)

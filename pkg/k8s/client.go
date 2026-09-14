@@ -37,6 +37,11 @@ func GetClientManager() *ClientManager {
 
 // Connect attempts to establish connection to the Kubernetes cluster
 func (m *ClientManager) Connect() error {
+	return m.ConnectWithContext("")
+}
+
+// ConnectWithContext connects using a specific context name or default
+func (m *ClientManager) ConnectWithContext(targetContext string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -44,11 +49,16 @@ func (m *ClientManager) Connect() error {
 	var err error
 	var contextName string
 
-	// 1. Try In-Cluster Config
-	config, err = rest.InClusterConfig()
-	if err == nil {
-		contextName = "in-cluster"
-	} else {
+	// 1. Try In-Cluster Config if targetContext is "in-cluster" or empty and in-cluster succeeds
+	if targetContext == "in-cluster" || targetContext == "" {
+		inClusterCfg, inClusterErr := rest.InClusterConfig()
+		if inClusterErr == nil {
+			config = inClusterCfg
+			contextName = "in-cluster"
+		}
+	}
+
+	if config == nil {
 		// 2. Try Kubeconfig file
 		kubeconfig := os.Getenv("KUBECONFIG")
 		if kubeconfig == "" {
@@ -61,19 +71,30 @@ func (m *ClientManager) Connect() error {
 		if kubeconfig != "" {
 			loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
 			configOverrides := &clientcmd.ConfigOverrides{}
+			if targetContext != "" {
+				configOverrides.CurrentContext = targetContext
+			}
+
 			clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
 
 			rawConfig, rawErr := clientConfig.RawConfig()
 			if rawErr == nil {
-				contextName = rawConfig.CurrentContext
+				if targetContext != "" {
+					contextName = targetContext
+				} else {
+					contextName = rawConfig.CurrentContext
+				}
 			}
 
 			config, err = clientConfig.ClientConfig()
 		}
 	}
 
-	if err != nil {
+	if err != nil || config == nil {
 		m.Connected = false
+		if err == nil {
+			err = fmt.Errorf("no valid kubeconfig or in-cluster config found")
+		}
 		m.LastError = fmt.Errorf("failed to load kubeconfig: %w", err)
 		return m.LastError
 	}
@@ -108,6 +129,104 @@ func (m *ClientManager) Connect() error {
 	m.LastError = nil
 
 	return nil
+}
+
+// SetKubeconfigContent connects to a cluster using a raw Kubeconfig string (e.g. Raspberry Pi or external K8s)
+func (m *ClientManager) SetKubeconfigContent(rawKubeconfig []byte, customContextName string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	clientConfig, err := clientcmd.NewClientConfigFromBytes(rawKubeconfig)
+	if err != nil {
+		return fmt.Errorf("invalid kubeconfig format: %w", err)
+	}
+
+	rawConfig, err := clientConfig.RawConfig()
+	if err != nil {
+		return fmt.Errorf("failed to parse kubeconfig raw config: %w", err)
+	}
+
+	contextName := customContextName
+	if contextName == "" {
+		contextName = rawConfig.CurrentContext
+	}
+	if contextName == "" {
+		contextName = "external-cluster"
+	}
+
+	config, err := clientConfig.ClientConfig()
+	if err != nil {
+		return fmt.Errorf("failed to build client config from bytes: %w", err)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create clientset: %w", err)
+	}
+
+	dynamicClient, err := dynamic.NewForConfig(config)
+	if err != nil {
+		return fmt.Errorf("failed to create dynamic client: %w", err)
+	}
+
+	// Verify connectivity to the external cluster (e.g. Raspberry Pi)
+	_, err = clientset.Discovery().ServerVersion()
+	if err != nil {
+		m.Connected = false
+		m.LastError = fmt.Errorf("external cluster unreachable: %w", err)
+		return m.LastError
+	}
+
+	// Save custom kubeconfig to ~/.kube/navis-external.yaml for persistence
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		navisKubeDir := filepath.Join(homeDir, ".kube")
+		_ = os.MkdirAll(navisKubeDir, 0755)
+		_ = os.WriteFile(filepath.Join(navisKubeDir, "navis-external.yaml"), rawKubeconfig, 0600)
+	}
+
+	m.Config = config
+	m.Clientset = clientset
+	m.DynamicClient = dynamicClient
+	m.Connected = true
+	m.ContextName = contextName
+	m.LastError = nil
+
+	return nil
+}
+
+// GetAvailableContexts lists all available contexts in ~/.kube/config
+func (m *ClientManager) GetAvailableContexts() ([]string, string, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	kubeconfig := os.Getenv("KUBECONFIG")
+	if kubeconfig == "" {
+		homeDir, err := os.UserHomeDir()
+		if err == nil {
+			kubeconfig = filepath.Join(homeDir, ".kube", "config")
+		}
+	}
+
+	if kubeconfig == "" {
+		return []string{}, m.ContextName, nil
+	}
+
+	loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
+	configOverrides := &clientcmd.ConfigOverrides{}
+	clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+
+	rawConfig, err := clientConfig.RawConfig()
+	if err != nil {
+		return []string{}, m.ContextName, err
+	}
+
+	contexts := make([]string, 0, len(rawConfig.Contexts))
+	for name := range rawConfig.Contexts {
+		contexts = append(contexts, name)
+	}
+
+	return contexts, m.ContextName, nil
 }
 
 // CheckConnectivity verifies and refreshes connectivity status

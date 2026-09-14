@@ -18,10 +18,13 @@
       </div>
     </div>
     <div class="header-status">
-      <div class="cluster-badge" id="clusterStatusBadge">
+      <div class="cluster-badge" id="clusterStatusBadge" onclick="openClusterModal()" style="cursor:pointer;" title="Click to switch cluster or connect Raspberry Pi / Remote K8s">
         <span class="status-dot" id="statusDot"></span>
         <span id="clusterStatusText">Connecting...</span>
       </div>
+      <button class="btn btn-outline" onclick="openClusterModal()" title="Connect to external cluster / Raspberry Pi">
+        🔌 Cluster Settings
+      </button>
       <button class="btn btn-outline" onclick="openRegistryModal()" title="Configure Docker Registry & Secrets">
         🔐 Registry
       </button>
@@ -54,6 +57,15 @@
 
     <!-- Tab 2: Offers Catalog -->
     <section id="offers-tab" class="tab-content">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+        <div>
+          <h2 style="font-size: 1.25rem; color: var(--text-primary);">Infrastructure Offers Catalog</h2>
+          <p style="font-size: 0.85rem; color: var(--text-secondary);">Core infrastructure and custom dynamic offers with automated service binding.</p>
+        </div>
+        <button class="btn btn-outline" onclick="openCustomOfferModal()">
+          <span>+</span> Create Custom Offer
+        </button>
+      </div>
       <div id="offersList" class="cards-grid">
         <!-- Rendered dynamically via JS -->
       </div>
@@ -238,6 +250,119 @@
         <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
           <button type="button" class="btn btn-outline" onclick="closeModal('registryModal')">Cancel</button>
           <button type="submit" class="btn btn-primary">Save & Sync Secret</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Cluster Settings / External Cluster / Raspberry Pi Modal -->
+  <div class="modal-backdrop" id="clusterModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🔌 Cluster Connection & Settings</h3>
+        <button class="close-btn" onclick="closeModal('clusterModal')">&times;</button>
+      </div>
+
+      <div style="margin-bottom: 1.5rem;">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
+          Connect NavisPaaS to a local cluster or an external cluster (e.g. <strong>Raspberry Pi k3s cluster</strong>, Remote K8s, EKS, GKE, AKS).
+        </p>
+
+        <!-- Option A: Switch Kubeconfig Context -->
+        <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
+          <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-primary);">Switch Kubeconfig Context</h4>
+          <div style="display: flex; gap: 0.5rem;">
+            <select id="clusterContextSelect" class="form-control" style="flex: 1;">
+              <option value="">Loading contexts...</option>
+            </select>
+            <button class="btn btn-primary btn-sm" onclick="handleSwitchContext()">Switch Context</button>
+          </div>
+        </div>
+
+        <!-- Option B: Connect External Cluster via Kubeconfig Paste -->
+        <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;">
+          <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-primary);">Connect External Cluster (Paste Kubeconfig / Raspberry Pi)</h4>
+          <form onsubmit="handleSaveKubeconfig(event)">
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label>Custom Context Name</label>
+              <input type="text" id="extContextName" class="form-control" placeholder="e.g. raspberry-pi-k3s">
+            </div>
+            <div class="form-group" style="margin-bottom: 0.75rem;">
+              <label>Kubeconfig YAML Content</label>
+              <textarea id="extKubeconfigText" class="form-control" rows="6" style="font-family: monospace; font-size: 0.8rem;" placeholder="apiVersion: v1&#10;clusters:&#10;- cluster:&#10;    server: https://192.168.1.100:6443&#10;..." required></textarea>
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">⚡ Connect to External Cluster</button>
+          </form>
+        </div>
+      </div>
+
+      <div style="display: flex; justify-content: flex-end;">
+        <button type="button" class="btn btn-outline" onclick="closeModal('clusterModal')">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Create Custom Offer Modal -->
+  <div class="modal-backdrop" id="customOfferModal">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>🧩 Create Custom Offer</h3>
+        <button class="close-btn" onclick="closeModal('customOfferModal')">&times;</button>
+      </div>
+      <form onsubmit="handleCreateCustomOffer(event)">
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+          Add a custom infrastructure service (e.g. MongoDB, Elasticsearch, Cassandra) that NavisPaaS will automatically deploy and inject environment variables for.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Offer ID <span style="color:#ef4444">*</span></label>
+            <input type="text" id="custOfferID" class="form-control" placeholder="e.g. mongodb" required>
+          </div>
+          <div class="form-group">
+            <label>Offer Name <span style="color:#ef4444">*</span></label>
+            <input type="text" id="custOfferName" class="form-control" placeholder="e.g. MongoDB NoSQL" required>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Category</label>
+            <select id="custOfferCategory" class="form-control">
+              <option value="Database">Database</option>
+              <option value="Messaging">Messaging</option>
+              <option value="Networking">Networking</option>
+              <option value="Observability">Observability</option>
+              <option value="Storage">Storage</option>
+              <option value="Custom">Custom</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>Env Variable Prefix <span style="color:#ef4444">*</span></label>
+            <input type="text" id="custOfferEnvPrefix" class="form-control" placeholder="e.g. MONGODB" required>
+            <small style="color:#64748b;font-size:0.7rem;">Injects MONGODB_HOST, MONGODB_PORT, MONGODB_URL</small>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
+          <div class="form-group">
+            <label>Docker Image <span style="color:#ef4444">*</span></label>
+            <input type="text" id="custOfferImage" class="form-control" placeholder="e.g. mongo:7.0" required>
+          </div>
+          <div class="form-group">
+            <label>Port <span style="color:#ef4444">*</span></label>
+            <input type="number" id="custOfferPort" class="form-control" placeholder="27017" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Description</label>
+          <textarea id="custOfferDesc" class="form-control" rows="2" placeholder="Brief explanation of this custom offer..."></textarea>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
+          <button type="button" class="btn btn-outline" onclick="closeModal('customOfferModal')">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create & Register Offer</button>
         </div>
       </form>
     </div>

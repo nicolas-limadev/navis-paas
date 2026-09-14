@@ -276,6 +276,31 @@ func (d *DynamicOffer) Unbind(ctx context.Context, cm *k8s.ClientManager, app *m
 	return err
 }
 
+// SaveCustomOffer writes a custom offer definition to the local custom-offers directory
+func SaveCustomOffer(def DynamicOfferDefinition) error {
+	if def.ID == "" || def.Name == "" {
+		return fmt.Errorf("offer ID and Name are required")
+	}
+
+	cwd, err := os.Getwd()
+	if err != nil {
+		return err
+	}
+
+	dir := filepath.Join(cwd, "custom-offers")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return fmt.Errorf("failed to create custom-offers directory: %w", err)
+	}
+
+	filePath := filepath.Join(dir, def.ID+".yaml")
+	data, err := yaml.Marshal(def)
+	if err != nil {
+		return fmt.Errorf("failed to marshal offer to YAML: %w", err)
+	}
+
+	return os.WriteFile(filePath, data, 0644)
+}
+
 // LoadCustomOffers scans a directory for custom offer YAML definitions
 func LoadCustomOffers(dir string) ([]OfferHandler, error) {
 	var list []OfferHandler

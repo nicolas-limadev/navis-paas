@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/nicolas-limadev/navis-paas/pkg/models"
+	"github.com/nicolas-limadev/navis-paas/pkg/offers"
 
 	"github.com/gin-gonic/gin"
 )
@@ -126,6 +127,28 @@ func (m *mockOfferService) UnbindOffer(c *gin.Context, app *models.Application, 
 	return nil
 }
 
+func (m *mockOfferService) CreateCustomOffer(c *gin.Context, def offers.DynamicOfferDefinition) error {
+	m.offers = append(m.offers, models.OfferDefinition{
+		ID:          def.ID,
+		Name:        def.Name,
+		Category:    def.Category,
+		Description: def.Description,
+		Version:     def.Version,
+	})
+	return nil
+}
+
+func (m *mockOfferService) DeleteCustomOffer(c *gin.Context, id string) error {
+	var filtered []models.OfferDefinition
+	for _, o := range m.offers {
+		if o.ID != id {
+			filtered = append(filtered, o)
+		}
+	}
+	m.offers = filtered
+	return nil
+}
+
 type mockClusterChecker struct{}
 
 func (m *mockClusterChecker) CheckStatus(c *gin.Context) models.ClusterStatus {
@@ -134,6 +157,18 @@ func (m *mockClusterChecker) CheckStatus(c *gin.Context) models.ClusterStatus {
 		ClusterVersion: "v1.32.0",
 		MinikubeActive: true,
 	}
+}
+
+func (m *mockClusterChecker) GetClusterContexts(c *gin.Context) ([]string, string, error) {
+	return []string{"minikube", "raspberry-pi-cluster"}, "minikube", nil
+}
+
+func (m *mockClusterChecker) SwitchClusterContext(c *gin.Context, contextName string) error {
+	return nil
+}
+
+func (m *mockClusterChecker) SetClusterKubeconfig(c *gin.Context, rawKubeconfig []byte, contextName string) error {
+	return nil
 }
 
 type mockRegistryProvider struct {

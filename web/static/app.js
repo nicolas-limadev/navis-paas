@@ -215,6 +215,11 @@ function renderOffers() {
               Open Grafana (192.168.49.2:30080) ↗
             </a>
           ` : ''}
+          ${['kafka','monitoring','redis','postgresql','kong','rabbitmq','nats'].indexOf(offer.id) === -1 ? `
+            <button class="btn btn-danger btn-sm" onclick="handleDeleteCustomOffer('${offer.id}')" title="Delete custom offer definition">
+              Delete
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -582,4 +587,157 @@ spec:
 
   const el = document.getElementById('backstageTemplateCode');
   if (el) el.textContent = templateYaml;
+}
+
+// Cluster Connection & Settings Handlers
+async function openClusterModal() {
+  document.getElementById('clusterModal').classList.add('open');
+  await fetchClusterContexts();
+}
+
+async function fetchClusterContexts() {
+  try {
+    const res = await fetch('/api/v1/cluster/contexts');
+    if (!res.ok) return;
+    const data = await res.json();
+    const select = document.getElementById('clusterContextSelect');
+    const contexts = data.contexts || [];
+    const current = data.current || '';
+
+    if (contexts.length === 0) {
+      select.innerHTML = '<option value="">No local contexts found</option>';
+      return;
+    }
+
+    select.innerHTML = contexts.map(ctx => `
+      <option value="${ctx}" ${ctx === current ? 'selected' : ''}>
+        ${ctx} ${ctx === current ? '(active)' : ''}
+      </option>
+    `).join('');
+  } catch (err) {
+    console.error('Failed to fetch cluster contexts:', err);
+  }
+}
+
+async function handleSwitchContext() {
+  const select = document.getElementById('clusterContextSelect');
+  const contextName = select.value;
+  if (!contextName) return;
+
+  try {
+    const res = await fetch('/api/v1/cluster/context', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contextName })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Failed to switch context: ' + (err.error || res.statusText));
+      return;
+    }
+
+    alert(`Switched to cluster context '${contextName}'!`);
+    closeModal('clusterModal');
+    fetchClusterHealth();
+    fetchApps();
+    fetchOffers();
+  } catch (err) {
+    alert('Error switching context: ' + err.message);
+  }
+}
+
+async function handleSaveKubeconfig(e) {
+  e.preventDefault();
+  const contextName = document.getElementById('extContextName').value.trim();
+  const kubeconfig = document.getElementById('extKubeconfigText').value.trim();
+
+  if (!kubeconfig) {
+    alert('Please paste a valid Kubeconfig YAML content.');
+    return;
+  }
+
+  try {
+    const res = await fetch('/api/v1/cluster/kubeconfig', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ kubeconfig, contextName })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Failed to connect to external cluster: ' + (err.error || res.statusText));
+      return;
+    }
+
+    alert('Successfully connected to external cluster!');
+    closeModal('clusterModal');
+    document.getElementById('extKubeconfigText').value = '';
+    fetchClusterHealth();
+    fetchApps();
+    fetchOffers();
+  } catch (err) {
+    alert('Error connecting to external cluster: ' + err.message);
+  }
+}
+
+// Custom Offer Creation & Deletion Handlers
+function openCustomOfferModal() {
+  document.getElementById('customOfferModal').classList.add('open');
+}
+
+async function handleCreateCustomOffer(e) {
+  e.preventDefault();
+  const id = document.getElementById('custOfferID').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+  const name = document.getElementById('custOfferName').value.trim();
+  const category = document.getElementById('custOfferCategory').value;
+  const envPrefix = document.getElementById('custOfferEnvPrefix').value.trim().toUpperCase();
+  const image = document.getElementById('custOfferImage').value.trim();
+  const port = parseInt(document.getElementById('custOfferPort').value, 10);
+  const description = document.getElementById('custOfferDesc').value.trim();
+
+  try {
+    const res = await fetch('/api/v1/offers/custom', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id,
+        name,
+        category,
+        envPrefix,
+        image,
+        port,
+        description,
+        version: '1.0'
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      alert('Failed to create custom offer: ' + (err.error || res.statusText));
+      return;
+    }
+
+    alert(`Custom offer '${name}' created successfully!`);
+    closeModal('customOfferModal');
+    fetchOffers();
+  } catch (err) {
+    alert('Error creating custom offer: ' + err.message);
+  }
+}
+
+async function handleDeleteCustomOffer(offerId) {
+  if (!confirm(`Are you sure you want to delete custom offer '${offerId}'?`)) return;
+
+  try {
+    const res = await fetch(`/api/v1/offers/custom/${offerId}`, { method: 'DELETE' });
+    if (res.ok) {
+      fetchOffers();
+    } else {
+      const err = await res.json();
+      alert('Failed to delete offer: ' + (err.error || res.statusText));
+    }
+  } catch (err) {
+    alert('Error deleting offer: ' + err.message);
+  }
 }

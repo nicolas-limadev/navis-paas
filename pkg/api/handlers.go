@@ -6,6 +6,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/nicolas-limadev/navis-paas/pkg/offers"
 )
 
 // AppServiceProvider abstracts K8s app service
@@ -25,11 +26,16 @@ type OfferServiceProvider interface {
 	GetOfferStatus(ctx *gin.Context, offerID string) (map[string]bool, error)
 	BindOffer(ctx *gin.Context, app *Application, offerID string, params map[string]string) (map[string]string, error)
 	UnbindOffer(ctx *gin.Context, app *Application, offerID string) error
+	CreateCustomOffer(ctx *gin.Context, def offers.DynamicOfferDefinition) error
+	DeleteCustomOffer(ctx *gin.Context, id string) error
 }
 
 // ClusterChecker checks K8s cluster status
 type ClusterChecker interface {
 	CheckStatus(ctx *gin.Context) ClusterStatus
+	GetClusterContexts(ctx *gin.Context) ([]string, string, error)
+	SwitchClusterContext(ctx *gin.Context, contextName string) error
+	SetClusterKubeconfig(ctx *gin.Context, rawKubeconfig []byte, contextName string) error
 }
 
 // RegistryProvider manages private container registries
@@ -268,4 +274,82 @@ func (h *Handler) UpdateRegistry(c *gin.Context) {
 		"message":  "registry configuration saved successfully",
 		"registry": status,
 	})
+}
+
+// CreateCustomOffer registers a user-defined offer dynamically
+func (h *Handler) CreateCustomOffer(c *gin.Context) {
+	var def offers.DynamicOfferDefinition
+	if err := c.ShouldBindJSON(&def); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload: " + err.Error()})
+		return
+	}
+
+	if err := h.offers.CreateCustomOffer(c, def); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to create custom offer: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusCreated, gin.H{"message": fmt.Sprintf("custom offer '%s' created successfully", def.Name)})
+}
+
+// DeleteCustomOffer removes a user-defined custom offer
+func (h *Handler) DeleteCustomOffer(c *gin.Context) {
+	id := c.Param("id")
+	if err := h.offers.DeleteCustomOffer(c, id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to delete custom offer: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("custom offer '%s' deleted successfully", id)})
+}
+
+// GetClusterContexts lists all available contexts in kubeconfig
+func (h *Handler) GetClusterContexts(c *gin.Context) {
+	contexts, current, err := h.cluster.GetClusterContexts(c)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"contexts": contexts,
+		"current":  current,
+	})
+}
+
+// SwitchClusterContext switches active Kubernetes context
+func (h *Handler) SwitchClusterContext(c *gin.Context) {
+	var req struct {
+		ContextName string `json:"contextName" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload: " + err.Error()})
+		return
+	}
+
+	if err := h.cluster.SwitchClusterContext(c, req.ContextName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("failed to switch context to '%s': %s", req.ContextName, err.Error())})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": fmt.Sprintf("switched to cluster context '%s'", req.ContextName)})
+}
+
+// SetClusterKubeconfig connects to an external cluster (e.g. Raspberry Pi) via uploaded/pasted Kubeconfig
+func (h *Handler) SetClusterKubeconfig(c *gin.Context) {
+	var req struct {
+		Kubeconfig  string `json:"kubeconfig" binding:"required"`
+		ContextName string `json:"contextName"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid payload: " + err.Error()})
+		return
+	}
+
+	if err := h.cluster.SetClusterKubeconfig(c, []byte(req.Kubeconfig), req.ContextName); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "failed to connect to external cluster: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "connected to external cluster successfully"})
 }

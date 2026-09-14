@@ -96,3 +96,25 @@ func (c *Catalog) GetOffer(id string) (OfferHandler, error) {
 	}
 	return handler, nil
 }
+
+func (c *Catalog) AddCustomOffer(def DynamicOfferDefinition) error {
+	if err := SaveCustomOffer(def); err != nil {
+		return err
+	}
+	c.Register(&DynamicOffer{Def: def})
+	return nil
+}
+
+func (c *Catalog) RemoveCustomOffer(id string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.handlers, id)
+
+	cwd, err := os.Getwd()
+	if err == nil {
+		_ = os.Remove(filepath.Join(cwd, "custom-offers", id+".yaml"))
+		_ = os.Remove(filepath.Join(cwd, "custom-offers", id+".yml"))
+	}
+	return nil
+}
