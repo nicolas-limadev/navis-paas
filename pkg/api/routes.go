@@ -1,11 +1,13 @@
 package api
 
 import (
+	"io/fs"
 	"net/http"
 	"os"
 	"path/filepath"
 
 	"github.com/gin-gonic/gin"
+	navispaas "github.com/nicolas-limadev/navis-paas"
 )
 
 // SetupRouter configures the Gin engine with all routes and static file handlers
@@ -26,12 +28,30 @@ func SetupRouter(h *Handler, staticDir string) *gin.Engine {
 		c.Next()
 	})
 
-	// Serve Static UI Dashboard if available
+	// Serve Static UI Dashboard (prefer disk fallback to embedded)
+	served := false
 	if staticDir != "" {
 		if _, err := os.Stat(staticDir); err == nil {
 			r.Static("/static", staticDir)
 			r.GET("/", func(c *gin.Context) {
 				c.File(filepath.Join(staticDir, "index.html"))
+			})
+			served = true
+		}
+	}
+
+	if !served {
+		// Fallback to embedded static files
+		subFS, err := fs.Sub(navispaas.StaticFS, "web/static")
+		if err == nil {
+			r.StaticFS("/static", http.FS(subFS))
+			r.GET("/", func(c *gin.Context) {
+				data, err := fs.ReadFile(subFS, "index.html")
+				if err != nil {
+					c.String(http.StatusInternalServerError, "Internal Server Error")
+					return
+				}
+				c.Data(http.StatusOK, "text/html; charset=utf-8", data)
 			})
 		}
 	}
