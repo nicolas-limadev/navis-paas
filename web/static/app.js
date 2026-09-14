@@ -215,7 +215,7 @@ function renderOffers() {
               Open Grafana (192.168.49.2:30080) ↗
             </a>
           ` : ''}
-          ${['kafka','monitoring','redis','postgresql','kong','rabbitmq','nats'].indexOf(offer.id) === -1 ? `
+          ${['kafka','monitoring','redis','postgresql','mysql','mongodb','kong','nginx','rabbitmq','nats','minio'].indexOf(offer.id) === -1 ? `
             <button class="btn btn-danger btn-sm" onclick="handleDeleteCustomOffer('${offer.id}')" title="Delete custom offer definition">
               Delete
             </button>

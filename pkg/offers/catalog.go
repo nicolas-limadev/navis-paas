@@ -37,9 +37,13 @@ func NewCatalog(cm *k8s.ClientManager) *Catalog {
 	c.Register(&MonitoringOffer{})
 	c.Register(&RedisOffer{})
 	c.Register(&PostgresOffer{})
+	c.Register(&MySQLOffer{})
+	c.Register(&MongoDBOffer{})
 	c.Register(&KongGatewayOffer{})
+	c.Register(&NginxOffer{})
 	c.Register(&RabbitMQOffer{})
 	c.Register(&NATSOffer{})
+	c.Register(&MinIOOffer{})
 
 	// Load dynamic/custom YAML-based offers from disk
 	// 1. Scan current working directory 'custom-offers'
