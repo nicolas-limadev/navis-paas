@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -81,9 +82,9 @@ native web dashboard, allowing developers to manage workloads via both web and C
 
 		log.Printf("🚀 NavisPaaS Server listening on http://0.0.0.0:%s", startPort)
 		log.Printf("🌐 Web Dashboard: http://localhost:%s/", startPort)
-		log.Printf("📚 API Docs: http://localhost:%s/api/v1/openapi.json", startPort)
+		log.Printf("📚 OpenAPI Docs / Interactive Swagger: http://localhost:%s/api/v1/docs", startPort)
 
-		if err := router.Run(":" + startPort); err != nil {
+		if err := http.ListenAndServe(":" + startPort, router); err != nil {
 			log.Fatalf("Server failed to run: %v", err)
 		}
 	},

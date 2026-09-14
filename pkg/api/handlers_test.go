@@ -2,16 +2,16 @@ package api
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/nicolas-limadev/navis-paas/pkg/models"
 	"github.com/nicolas-limadev/navis-paas/pkg/offers"
-
-	"github.com/gin-gonic/gin"
 )
 
 type mockAppService struct {
@@ -24,7 +24,7 @@ func newMockAppService() *mockAppService {
 	}
 }
 
-func (m *mockAppService) CreateOrUpdateApp(c *gin.Context, req models.CreateAppRequest) (*models.Application, error) {
+func (m *mockAppService) CreateOrUpdateApp(ctx context.Context, req models.CreateAppRequest) (*models.Application, error) {
 	app := models.Application{
 		Name:         req.Name,
 		Namespace:    "navis-apps",
@@ -40,7 +40,7 @@ func (m *mockAppService) CreateOrUpdateApp(c *gin.Context, req models.CreateAppR
 	return &app, nil
 }
 
-func (m *mockAppService) ListApps(c *gin.Context, namespace string) ([]models.Application, error) {
+func (m *mockAppService) ListApps(ctx context.Context, namespace string) ([]models.Application, error) {
 	var list []models.Application
 	for _, a := range m.apps {
 		list = append(list, a)
@@ -48,7 +48,7 @@ func (m *mockAppService) ListApps(c *gin.Context, namespace string) ([]models.Ap
 	return list, nil
 }
 
-func (m *mockAppService) GetApp(c *gin.Context, namespace, name string) (*models.Application, error) {
+func (m *mockAppService) GetApp(ctx context.Context, namespace, name string) (*models.Application, error) {
 	app, exists := m.apps[name]
 	if !exists {
 		return nil, http.ErrMissingFile
@@ -56,8 +56,8 @@ func (m *mockAppService) GetApp(c *gin.Context, namespace, name string) (*models
 	return &app, nil
 }
 
-func (m *mockAppService) GetAppDetails(c *gin.Context, namespace, name string) (*models.AppDetailResponse, error) {
-	app, err := m.GetApp(c, namespace, name)
+func (m *mockAppService) GetAppDetails(ctx context.Context, namespace, name string) (*models.AppDetailResponse, error) {
+	app, err := m.GetApp(ctx, namespace, name)
 	if err != nil {
 		return nil, err
 	}
@@ -69,12 +69,12 @@ func (m *mockAppService) GetAppDetails(c *gin.Context, namespace, name string) (
 	}, nil
 }
 
-func (m *mockAppService) DeleteApp(c *gin.Context, namespace, name string) error {
+func (m *mockAppService) DeleteApp(ctx context.Context, namespace, name string) error {
 	delete(m.apps, name)
 	return nil
 }
 
-func (m *mockAppService) GetAppLogs(c *gin.Context, namespace, name string, tailLines int64) (string, error) {
+func (m *mockAppService) GetAppLogs(ctx context.Context, namespace, name string, tailLines int64) (string, error) {
 	return "mock container logs line 1\nmock container logs line 2", nil
 }
 
@@ -91,19 +91,19 @@ func newMockOfferService() *mockOfferService {
 	}
 }
 
-func (m *mockOfferService) ListOffers(c *gin.Context) []models.OfferDefinition {
+func (m *mockOfferService) ListOffers(ctx context.Context) []models.OfferDefinition {
 	return m.offers
 }
 
-func (m *mockOfferService) InstallOffer(c *gin.Context, offerID string, prometheus, grafana, otel bool) error {
+func (m *mockOfferService) InstallOffer(ctx context.Context, offerID string, prometheus, grafana, otel bool) error {
 	return nil
 }
 
-func (m *mockOfferService) GetOfferStatus(c *gin.Context, offerID string) (map[string]bool, error) {
+func (m *mockOfferService) GetOfferStatus(ctx context.Context, offerID string) (map[string]bool, error) {
 	return map[string]bool{"installed": true}, nil
 }
 
-func (m *mockOfferService) BindOffer(c *gin.Context, app *models.Application, offerID string, params map[string]string) (map[string]string, error) {
+func (m *mockOfferService) BindOffer(ctx context.Context, app *models.Application, offerID string, params map[string]string) (map[string]string, error) {
 	envs := map[string]string{
 		"OFFER_BOUND": offerID,
 	}
@@ -116,7 +116,7 @@ func (m *mockOfferService) BindOffer(c *gin.Context, app *models.Application, of
 	return envs, nil
 }
 
-func (m *mockOfferService) UnbindOffer(c *gin.Context, app *models.Application, offerID string) error {
+func (m *mockOfferService) UnbindOffer(ctx context.Context, app *models.Application, offerID string) error {
 	var filtered []models.LinkedOffer
 	for _, o := range app.LinkedOffers {
 		if o.OfferID != offerID {
@@ -127,7 +127,7 @@ func (m *mockOfferService) UnbindOffer(c *gin.Context, app *models.Application, 
 	return nil
 }
 
-func (m *mockOfferService) CreateCustomOffer(c *gin.Context, def offers.DynamicOfferDefinition) error {
+func (m *mockOfferService) CreateCustomOffer(ctx context.Context, def offers.DynamicOfferDefinition) error {
 	m.offers = append(m.offers, models.OfferDefinition{
 		ID:          def.ID,
 		Name:        def.Name,
@@ -138,7 +138,7 @@ func (m *mockOfferService) CreateCustomOffer(c *gin.Context, def offers.DynamicO
 	return nil
 }
 
-func (m *mockOfferService) DeleteCustomOffer(c *gin.Context, id string) error {
+func (m *mockOfferService) DeleteCustomOffer(ctx context.Context, id string) error {
 	var filtered []models.OfferDefinition
 	for _, o := range m.offers {
 		if o.ID != id {
@@ -151,7 +151,7 @@ func (m *mockOfferService) DeleteCustomOffer(c *gin.Context, id string) error {
 
 type mockClusterChecker struct{}
 
-func (m *mockClusterChecker) CheckStatus(c *gin.Context) models.ClusterStatus {
+func (m *mockClusterChecker) CheckStatus(ctx context.Context) models.ClusterStatus {
 	return models.ClusterStatus{
 		Connected:      true,
 		ClusterVersion: "v1.32.0",
@@ -159,15 +159,15 @@ func (m *mockClusterChecker) CheckStatus(c *gin.Context) models.ClusterStatus {
 	}
 }
 
-func (m *mockClusterChecker) GetClusterContexts(c *gin.Context) ([]string, string, error) {
+func (m *mockClusterChecker) GetClusterContexts(ctx context.Context) ([]string, string, error) {
 	return []string{"minikube", "raspberry-pi-cluster"}, "minikube", nil
 }
 
-func (m *mockClusterChecker) SwitchClusterContext(c *gin.Context, contextName string) error {
+func (m *mockClusterChecker) SwitchClusterContext(ctx context.Context, contextName string) error {
 	return nil
 }
 
-func (m *mockClusterChecker) SetClusterKubeconfig(c *gin.Context, rawKubeconfig []byte, contextName string) error {
+func (m *mockClusterChecker) SetClusterKubeconfig(ctx context.Context, rawKubeconfig []byte, contextName string) error {
 	return nil
 }
 
@@ -175,7 +175,7 @@ type mockRegistryProvider struct {
 	config models.RegistryConfig
 }
 
-func (m *mockRegistryProvider) GetRegistryStatus(c *gin.Context) models.RegistryStatusResponse {
+func (m *mockRegistryProvider) GetRegistryStatus(ctx context.Context) models.RegistryStatusResponse {
 	return models.RegistryStatusResponse{
 		Server:        m.config.Server,
 		Username:      m.config.Username,
@@ -186,13 +186,12 @@ func (m *mockRegistryProvider) GetRegistryStatus(c *gin.Context) models.Registry
 	}
 }
 
-func (m *mockRegistryProvider) SaveRegistryConfig(c *gin.Context, cfg models.RegistryConfig) error {
+func (m *mockRegistryProvider) SaveRegistryConfig(ctx context.Context, cfg models.RegistryConfig) error {
 	m.config = cfg
 	return nil
 }
 
-func setupTestRouter() *gin.Engine {
-	gin.SetMode(gin.TestMode)
+func setupTestRouter() http.Handler {
 	appSvc := newMockAppService()
 	offerSvc := newMockOfferService()
 	clusterChecker := &mockClusterChecker{}
@@ -307,8 +306,8 @@ func TestOpenAPISpecEndpoint(t *testing.T) {
 		t.Fatalf("failed to decode OpenAPI spec: %v", err)
 	}
 
-	if spec["openapi"] != "3.0.0" {
-		t.Errorf("expected openapi 3.0.0, got %v", spec["openapi"])
+	if openapi, ok := spec["openapi"].(string); !ok || !strings.HasPrefix(openapi, "3.") {
+		t.Errorf("expected openapi 3.x, got %v", spec["openapi"])
 	}
 }
 

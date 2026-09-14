@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
 	"os"
 	"path/filepath"
 
@@ -65,9 +66,9 @@ func main() {
 
 	log.Printf("🚀 NavisPaaS Server listening on http://0.0.0.0:%s", port)
 	log.Printf("🌐 Web Dashboard: http://localhost:%s/", port)
-	log.Printf("📚 API Docs: http://localhost:%s/api/v1/openapi.json", port)
+	log.Printf("📚 OpenAPI Docs / Interactive Swagger: http://localhost:%s/api/v1/docs", port)
 
-	if err := router.Run(":" + port); err != nil {
+	if err := http.ListenAndServe(":" + port, router); err != nil {
 		log.Fatalf("Server failed to run: %v", err)
 	}
 }

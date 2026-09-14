@@ -5,8 +5,6 @@ import (
 
 	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
 	"github.com/nicolas-limadev/navis-paas/pkg/offers"
-
-	"github.com/gin-gonic/gin"
 )
 
 type AppAdapter struct {
@@ -17,28 +15,28 @@ func NewAppAdapter(svc *k8s.AppService) *AppAdapter {
 	return &AppAdapter{svc: svc}
 }
 
-func (a *AppAdapter) CreateOrUpdateApp(c *gin.Context, req CreateAppRequest) (*Application, error) {
-	return a.svc.CreateOrUpdateApp(c.Request.Context(), req)
+func (a *AppAdapter) CreateOrUpdateApp(ctx context.Context, req CreateAppRequest) (*Application, error) {
+	return a.svc.CreateOrUpdateApp(ctx, req)
 }
 
-func (a *AppAdapter) ListApps(c *gin.Context, namespace string) ([]Application, error) {
-	return a.svc.ListApps(c.Request.Context(), namespace)
+func (a *AppAdapter) ListApps(ctx context.Context, namespace string) ([]Application, error) {
+	return a.svc.ListApps(ctx, namespace)
 }
 
-func (a *AppAdapter) GetApp(c *gin.Context, namespace, name string) (*Application, error) {
-	return a.svc.GetApp(c.Request.Context(), namespace, name)
+func (a *AppAdapter) GetApp(ctx context.Context, namespace, name string) (*Application, error) {
+	return a.svc.GetApp(ctx, namespace, name)
 }
 
-func (a *AppAdapter) GetAppDetails(c *gin.Context, namespace, name string) (*AppDetailResponse, error) {
-	return a.svc.GetAppDetails(c.Request.Context(), namespace, name)
+func (a *AppAdapter) GetAppDetails(ctx context.Context, namespace, name string) (*AppDetailResponse, error) {
+	return a.svc.GetAppDetails(ctx, namespace, name)
 }
 
-func (a *AppAdapter) DeleteApp(c *gin.Context, namespace, name string) error {
-	return a.svc.DeleteApp(c.Request.Context(), namespace, name)
+func (a *AppAdapter) DeleteApp(ctx context.Context, namespace, name string) error {
+	return a.svc.DeleteApp(ctx, namespace, name)
 }
 
-func (a *AppAdapter) GetAppLogs(c *gin.Context, namespace, name string, tailLines int64) (string, error) {
-	return a.svc.GetAppLogs(c.Request.Context(), namespace, name, tailLines)
+func (a *AppAdapter) GetAppLogs(ctx context.Context, namespace, name string, tailLines int64) (string, error) {
+	return a.svc.GetAppLogs(ctx, namespace, name, tailLines)
 }
 
 type OfferAdapter struct {
@@ -50,11 +48,11 @@ func NewOfferAdapter(catalog *offers.Catalog, cm *k8s.ClientManager) *OfferAdapt
 	return &OfferAdapter{catalog: catalog, cm: cm}
 }
 
-func (o *OfferAdapter) ListOffers(c *gin.Context) []OfferDefinition {
-	return o.catalog.ListOffers(c.Request.Context())
+func (o *OfferAdapter) ListOffers(ctx context.Context) []OfferDefinition {
+	return o.catalog.ListOffers(ctx)
 }
 
-func (o *OfferAdapter) InstallOffer(c *gin.Context, offerID string, prometheus, grafana, otel bool) error {
+func (o *OfferAdapter) InstallOffer(ctx context.Context, offerID string, prometheus, grafana, otel bool) error {
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return err
@@ -63,14 +61,14 @@ func (o *OfferAdapter) InstallOffer(c *gin.Context, offerID string, prometheus, 
 	// If it's the monitoring offer, use component-level install
 	if offerID == "monitoring" {
 		if m, ok := handler.(*offers.MonitoringOffer); ok {
-			return m.InstallWithComponents(c.Request.Context(), o.cm, prometheus, grafana, otel)
+			return m.InstallWithComponents(ctx, o.cm, prometheus, grafana, otel)
 		}
 	}
 
-	return handler.Install(c.Request.Context(), o.cm)
+	return handler.Install(ctx, o.cm)
 }
 
-func (o *OfferAdapter) GetOfferStatus(c *gin.Context, offerID string) (map[string]bool, error) {
+func (o *OfferAdapter) GetOfferStatus(ctx context.Context, offerID string) (map[string]bool, error) {
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return nil, err
@@ -79,39 +77,39 @@ func (o *OfferAdapter) GetOfferStatus(c *gin.Context, offerID string) (map[strin
 	// If it's the monitoring offer, get component status
 	if offerID == "monitoring" {
 		if m, ok := handler.(*offers.MonitoringOffer); ok {
-			return m.GetComponentStatus(c.Request.Context(), o.cm), nil
+			return m.GetComponentStatus(ctx, o.cm), nil
 		}
 	}
 
 	// For other offers, just return installed status
-	installed, err := handler.IsInstalled(c.Request.Context(), o.cm)
+	installed, err := handler.IsInstalled(ctx, o.cm)
 	if err != nil {
 		return nil, err
 	}
 	return map[string]bool{"installed": installed}, nil
 }
 
-func (o *OfferAdapter) BindOffer(c *gin.Context, app *Application, offerID string, params map[string]string) (map[string]string, error) {
+func (o *OfferAdapter) BindOffer(ctx context.Context, app *Application, offerID string, params map[string]string) (map[string]string, error) {
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return nil, err
 	}
-	return handler.Bind(c.Request.Context(), o.cm, app, params)
+	return handler.Bind(ctx, o.cm, app, params)
 }
 
-func (o *OfferAdapter) UnbindOffer(c *gin.Context, app *Application, offerID string) error {
+func (o *OfferAdapter) UnbindOffer(ctx context.Context, app *Application, offerID string) error {
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return err
 	}
-	return handler.Unbind(c.Request.Context(), o.cm, app)
+	return handler.Unbind(ctx, o.cm, app)
 }
 
-func (o *OfferAdapter) CreateCustomOffer(c *gin.Context, def offers.DynamicOfferDefinition) error {
+func (o *OfferAdapter) CreateCustomOffer(ctx context.Context, def offers.DynamicOfferDefinition) error {
 	return o.catalog.AddCustomOffer(def)
 }
 
-func (o *OfferAdapter) DeleteCustomOffer(c *gin.Context, id string) error {
+func (o *OfferAdapter) DeleteCustomOffer(ctx context.Context, id string) error {
 	return o.catalog.RemoveCustomOffer(id)
 }
 
@@ -123,8 +121,7 @@ func NewClusterAdapter(cm *k8s.ClientManager) *ClusterAdapter {
 	return &ClusterAdapter{cm: cm}
 }
 
-func (ca *ClusterAdapter) CheckStatus(c *gin.Context) ClusterStatus {
-	ctx := context.Background()
+func (ca *ClusterAdapter) CheckStatus(ctx context.Context) ClusterStatus {
 	connected, version, err := ca.cm.CheckConnectivity(ctx)
 
 	errMsg := ""
@@ -170,15 +167,15 @@ func (ca *ClusterAdapter) CheckStatus(c *gin.Context) ClusterStatus {
 	}
 }
 
-func (ca *ClusterAdapter) GetClusterContexts(c *gin.Context) ([]string, string, error) {
+func (ca *ClusterAdapter) GetClusterContexts(ctx context.Context) ([]string, string, error) {
 	return ca.cm.GetAvailableContexts()
 }
 
-func (ca *ClusterAdapter) SwitchClusterContext(c *gin.Context, contextName string) error {
+func (ca *ClusterAdapter) SwitchClusterContext(ctx context.Context, contextName string) error {
 	return ca.cm.ConnectWithContext(contextName)
 }
 
-func (ca *ClusterAdapter) SetClusterKubeconfig(c *gin.Context, rawKubeconfig []byte, contextName string) error {
+func (ca *ClusterAdapter) SetClusterKubeconfig(ctx context.Context, rawKubeconfig []byte, contextName string) error {
 	return ca.cm.SetKubeconfigContent(rawKubeconfig, contextName)
 }
 
@@ -190,10 +187,10 @@ func NewRegistryAdapter(svc *k8s.RegistryService) *RegistryAdapter {
 	return &RegistryAdapter{svc: svc}
 }
 
-func (ra *RegistryAdapter) GetRegistryStatus(c *gin.Context) RegistryStatusResponse {
+func (ra *RegistryAdapter) GetRegistryStatus(ctx context.Context) RegistryStatusResponse {
 	return ra.svc.GetStatus()
 }
 
-func (ra *RegistryAdapter) SaveRegistryConfig(c *gin.Context, cfg RegistryConfig) error {
-	return ra.svc.SaveConfig(c.Request.Context(), cfg)
+func (ra *RegistryAdapter) SaveRegistryConfig(ctx context.Context, cfg RegistryConfig) error {
+	return ra.svc.SaveConfig(ctx, cfg)
 }
