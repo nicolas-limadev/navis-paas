@@ -97,8 +97,22 @@ microk8s enable dns storage
 microk8s config > ~/.kube/config
 ```
 
-### 3. Compilar e Rodar o NavisPaaS
+### 3. Instalar e Iniciar o NavisPaaS
+
+Você pode rodar o NavisPaaS compilando o código ou instalando globalmente via Go:
+
+#### Método 1: Instalação Global (Mais Prático)
 ```bash
+# Instala o CLI na sua máquina
+go install github.com/nicolas-limadev/navis-paas/cmd/navis@latest
+
+# Inicia o servidor e o dashboard web
+navis start
+```
+
+#### Método 2: Usando o Makefile local
+```bash
+# Compila e roda o servidor localmente
 make run
 ```
 
