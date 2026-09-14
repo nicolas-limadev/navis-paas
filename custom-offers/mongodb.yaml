@@ -1,0 +1,27 @@
+# Example of a Custom YAML-Defined Offer in NavisPaaS
+# Save this file inside your current working directory under 'custom-offers/mongodb.yaml'
+# or inside '$HOME/.navis/offers/mongodb.yaml'.
+# NavisPaaS will automatically load, render, and manage this offer!
+
+id: mongodb
+name: MongoDB NoSQL Database
+category: Database
+description: MongoDB - Popular, fast, document-oriented NoSQL database with auto-binding credentials.
+version: 7.0
+namespace: mongodb
+image: mongo:7.0
+port: 27017
+envPrefix: MONGODB
+parameters:
+  - key: rootUser
+    label: Root Username
+    type: string
+    default: admin
+    description: MongoDB root username
+    required: false
+  - key: rootPassword
+    label: Root Password
+    type: string
+    default: secret123
+    description: MongoDB root password
+    required: false

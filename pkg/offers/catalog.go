@@ -3,10 +3,12 @@ package offers
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"sync"
 
-	"github.com/nicolas-limadev/navis-paas/pkg/models"
 	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
+	"github.com/nicolas-limadev/navis-paas/pkg/models"
 )
 
 // OfferHandler defines the contract for any addon/offer in NavisPaaS
@@ -37,6 +39,26 @@ func NewCatalog(cm *k8s.ClientManager) *Catalog {
 	c.Register(&PostgresOffer{})
 	c.Register(&KongGatewayOffer{})
 	c.Register(&RabbitMQOffer{})
+	c.Register(&NATSOffer{})
+
+	// Load dynamic/custom YAML-based offers from disk
+	// 1. Scan current working directory 'custom-offers'
+	cwd, err := os.Getwd()
+	if err == nil {
+		customOffers, _ := LoadCustomOffers(filepath.Join(cwd, "custom-offers"))
+		for _, o := range customOffers {
+			c.Register(o)
+		}
+	}
+
+	// 2. Scan $HOME/.navis/offers
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		customOffers, _ := LoadCustomOffers(filepath.Join(homeDir, ".navis", "offers"))
+		for _, o := range customOffers {
+			c.Register(o)
+		}
+	}
 
 	return c
 }

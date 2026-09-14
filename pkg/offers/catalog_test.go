@@ -23,6 +23,7 @@ func TestCatalogOffersRegistration(t *testing.T) {
 		"monitoring": false,
 		"redis":      false,
 		"postgresql": false,
+		"nats":       false,
 	}
 
 	for _, o := range offersList {
