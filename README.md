@@ -1,7 +1,7 @@
 # NavisPaaS 🚢⚡
 
 > **Developer-Centric Kubernetes PaaS Engine**  
-> Plataforma PaaS simplificada para Kubernetes focada na experiência do desenvolvedor: faça deploy de microsserviços em namespaces dedicados e vincule ofertas de infraestrutura pré-integradas (Apache Kafka, RabbitMQ, Observabilidade Prometheus/Grafana/OTel, PostgreSQL, Redis, Kong API Gateway) com injeção automática de configurações e zero boilerplate de YAMLs.
+> Plataforma PaaS simplificada para Kubernetes focada na experiência do desenvolvedor: faça deploy de microsserviços em namespaces dedicados e vincule ofertas de infraestrutura pré-integradas (Databases, Messaging, Networking, Storage e Observabilidade) com injeção automática de configurações e zero boilerplate de YAMLs.
 
 ---
 
@@ -22,7 +22,7 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 ┌──────────────────────────▼─────────────────────────────┐
 │                 NavisPaaS Core Engine                  │
 │                     (Backend em Go)                    │
-│  - REST API (Gin + OpenAPI Spec / Swagger)             │
+│  - REST API (Huma v2 + net/http + OpenAPI 3.1)         │
 │  - Web Dashboard SPA Nativo (Dark Mode)                │
 │  - Catalog & Service Binding Engine                    │
 │  - Docker Registry Manager (imagePullSecrets)          │
@@ -46,13 +46,22 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 
 * 📁 **Namespace Dedicado por Aplicação**: Cada aplicação ganha seu próprio namespace isolado (ex: `football-mm`), garantindo isolamento total de Secrets, ConfigMaps, RBAC e cotas. Ao deletar o app, o namespace é limpo por completo sem deixar resíduos no cluster.
 * ⚡ **Acesso Direto com Minikube Tunnel**: Os serviços são criados como `Type: LoadBalancer`. Com o comando `make tunnel`, a aplicação ganha um IP externo roteável diretamente na sua máquina host (além de manter fallback via NodePort).
-* 🧩 **Catálogo de Ofertas Pré-Integradas (Addons)**:
-  * **Apache Kafka**: Provisionamento de broker KRaft, tópico e injeção de `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`, `KAFKA_CONSUMER_GROUP`, `KAFKA_CLIENT_ID`.
-  * **RabbitMQ**: Message broker com suporte AMQP, injeção de `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, `RABBITMQ_PASSWORD`, `RABBITMQ_URL`, Management UI na porta `30673`.
-  * **Observabilidade (Prometheus + Grafana + OTel)**: Stack unificada com checkboxes para instalação individual de cada componente. Scraping automático de métricas (`prometheus.io/scrape`), injeção de endpoints do OpenTelemetry Collector e dashboards pré-configurados no Grafana (`:30080`).
-  * **PostgreSQL Relational DB**: Instância PostgreSQL com injeção automática de variáveis padrão de mercado (`DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME`, `DATABASE_URL` e aliases `DB_*` e `POSTGRES_*`), compatível diretamente com TypeORM, NestJS, Prisma, Spring Boot e Django.
-  * **Redis Cache**: In-memory data store com injeção de `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`.
-  * **Kong API Gateway**: Gateway open-source mais popular do mercado com rate limiting, autenticação via API key, CORS e plugin ecosystem. Proxy na porta `30080`, Admin API na `30001`.
+* 🧩 **Catálogo Completo de Ofertas Pré-Integradas (por Categoria)**:
+
+| Categoria | ID | Nome | Descrição & Variáveis Injetadas |
+| :--- | :--- | :--- | :--- |
+| 🗄️ **Database** | `postgresql` | PostgreSQL | Relacional SQL com `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, etc. |
+| 🗄️ **Database** | `mysql` | MySQL DB | Relacional MySQL 8.0 com `MYSQL_URL`, `MYSQL_USER`, `MYSQL_PASSWORD`, `DATABASE_URL`. |
+| 🗄️ **Database** | `mongodb` | MongoDB NoSQL | NoSQL orientado a documentos com `MONGODB_URL`, `MONGO_URL`, `MONGODB_USER`. |
+| 🗄️ **Database** | `redis` | Redis Cache | In-memory cache e data store com `REDIS_HOST`, `REDIS_PORT`, `REDIS_URL`. |
+| 📨 **Messaging** | `kafka` | Apache Kafka | Event streaming broker KRaft com `KAFKA_BOOTSTRAP_SERVERS`, `KAFKA_TOPIC`. |
+| 📨 **Messaging** | `rabbitmq` | RabbitMQ | Message broker AMQP com `RABBITMQ_URL`, Management UI na porta `30673`. |
+| 📨 **Messaging** | `nats` | NATS JetStream | Pub/sub & queue broker com `NATS_URL`, `NATS_HOST` e suporte a JetStream. |
+| 🌐 **Networking** | `kong` | Kong Gateway | API Gateway com rate limiting, CORS e auth. Proxy (`:30080`), Admin (`:30001`). |
+| 🌐 **Networking** | `nginx` | NGINX Proxy | Web Server e reverse proxy de alta performance com `NGINX_HOST`, `NGINX_URL`. |
+| 📦 **Storage** | `minio` | MinIO Storage | Object storage S3 com `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. |
+| 📊 **Observability**| `monitoring` | Observability Stack | Prometheus + Grafana (`:30080`) + OpenTelemetry Collector (`OTEL_EXPORTER_*`). |
+| ⚙️ **Custom** | *custom* | Oferta Dinâmica | Crie ofertas personalizadas via UI/API ou arquivos `.yaml` em `custom-offers/`. |
 * 🐳 **Suporte a Docker Registry (Público, Privado e Minikube Local)**:
   * **Docker Hub**: Padrão nativo (`docker.io`) para imagens públicas.
   * **Registries Privados (GHCR, Harbor, ECR, GitLab)**: Gerenciamento de credenciais via UI/API com criação automática de Secret `kubernetes.io/dockerconfigjson` e injeção de `imagePullSecrets`.
