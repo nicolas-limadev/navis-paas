@@ -44,6 +44,7 @@ PostgreSQL, Redis, Monitoring, Kong API Gateway).`,
 	rootCmd.AddCommand(logsCmd)
 	rootCmd.AddCommand(installCmd)
 	rootCmd.AddCommand(statusCmd)
+	rootCmd.AddCommand(startCmd)
 	rootCmd.AddCommand(versionCmd)
 
 	if err := rootCmd.Execute(); err != nil {
