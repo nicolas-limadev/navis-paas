@@ -146,11 +146,33 @@ O CLI permite aos desenvolvedores gerenciar aplicações sem acessar o dashboard
 ### Instalação
 
 ```bash
-# Compilar o CLI
-make build-cli
+# Método 1: Instalação Global (Recomendado)
+# Nota: GOPROXY=direct garante que você baixe a versão mais recente sem cache de proxy antigo
+GOPROXY=direct go install github.com/nicolas-limadev/navis-paas/cmd/navis@latest
 
-# Ou instalar globalmente
-go install ./cmd/navis@latest
+# Método 2: Compilar localmente via Makefile
+make build-cli
+```
+
+> 💡 **Nota Importante para Zsh / Bash:**  
+> Se o terminal disser `command not found: navis` após a instalação global, você precisa adicionar a pasta de binários do Go (`$GOPATH/bin`) no seu PATH dentro do seu arquivo `.zshrc` (ou `.bashrc`). Veja como fazer abaixo.
+
+### ⚙️ Configuração do Terminal (.zshrc)
+
+Para garantir que o CLI `navis` fique acessível de qualquer diretório, adicione as seguintes linhas no final do seu arquivo `~/.zshrc`:
+
+```bash
+# Configurações do Go (GOPATH e PATH)
+export GOPATH=$HOME/go
+export PATH=$PATH:$GOPATH/bin
+
+# Opcional: Evita que o Go use caches desatualizados de repositórios em desenvolvimento rápido
+export GOPROXY=direct,proxy.golang.org
+```
+
+Depois de salvar o arquivo, recarregue as configurações no terminal atual:
+```bash
+source ~/.zshrc
 ```
 
 ### Configuração
