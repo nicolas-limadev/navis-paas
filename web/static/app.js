@@ -1,572 +1,593 @@
-// NavisPaaS Frontend Client Logic
-
-let state = {
-  apps: [],
-  offers: [],
-  cluster: {},
-  registry: {},
-  currentDetailApp: null,
-  monitoringStatus: {}
-};
-
-// Initialization
-document.addEventListener('DOMContentLoaded', () => {
-  fetchClusterHealth();
-  fetchApps();
-  fetchOffers();
-  fetchRegistry();
-  loadBackstageTemplate();
-
-  // Poll cluster health every 10s
-  setInterval(fetchClusterHealth, 10000);
-});
-
-function switchTab(tabId) {
-  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
-  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-
-  event.currentTarget.classList.add('active');
-  const target = document.getElementById(`${tabId}-tab`);
-  if (target) target.classList.add('active');
-
-  if (tabId === 'apps') fetchApps();
-  if (tabId === 'offers') fetchOffers();
-}
-
-async function fetchClusterHealth() {
-  try {
-    const res = await fetch('/api/v1/health');
-    const data = await res.json();
-    state.cluster = data;
-
-    const dot = document.getElementById('statusDot');
-    const text = document.getElementById('clusterStatusText');
-
-    if (data.connected) {
-      dot.className = 'status-dot connected';
-      const provider = data.provider || 'kubernetes';
-      const version = data.clusterVersion || 'v1.32';
-      text.textContent = `${provider.charAt(0).toUpperCase() + provider.slice(1)} Ready (${version})`;
-    } else {
-      dot.className = 'status-dot';
-      text.textContent = 'Kubernetes Offline (Start your cluster)';
-    }
-  } catch (err) {
-    console.error('Failed to fetch cluster health:', err);
-  }
-}
-
-async function fetchApps() {
-  try {
-    const res = await fetch('/api/v1/apps');
-    const apps = await res.json();
-    state.apps = Array.isArray(apps) ? apps : [];
-    renderApps();
-  } catch (err) {
-    console.error('Failed to fetch apps:', err);
-  }
-}
-
-async function fetchOffers() {
-  try {
-    const res = await fetch('/api/v1/offers');
-    const offers = await res.json();
-    state.offers = Array.isArray(offers) ? offers : [];
+// Evolved NavisPaaS Alpine.js Application Logic
+function navisApp() {
+  return {
+    activeTab: 'apps',
+    apps: [],
+    offers: [],
+    cluster: { connected: false },
+    registry: {},
+    monitoringStatus: { prometheus: false, grafana: false, otel: false },
+    clusterContexts: [],
     
-    // Fetch monitoring component status if installed
-    const monitoringOffer = state.offers.find(o => o.id === 'monitoring');
-    if (monitoringOffer && monitoringOffer.installed) {
+    // Modal visibilities
+    modals: {
+      deploy: false,
+      cluster: false,
+      customOffer: false,
+      link: false,
+      details: false,
+    },
+
+    // Forms states
+    deployForm: {
+      name: '',
+      namespace: '',
+      image: '',
+      port: 80,
+      replicas: 1,
+      linkPostgres: false,
+      linkRedis: false,
+      linkKafka: false,
+      linkMonitoring: false,
+    },
+
+    clusterForm: {
+      contextName: '',
+      externalName: '',
+      externalKubeconfig: '',
+    },
+
+    customOfferForm: {
+      id: '',
+      name: '',
+      category: 'Database',
+      envPrefix: '',
+      image: '',
+      port: 80,
+      description: '',
+    },
+
+    linkForm: {
+      appName: '',
+      appNamespace: '',
+      offerId: '',
+      params: {},
+    },
+
+    appDetails: {
+      name: '',
+      namespace: '',
+      pods: [],
+      envVars: {},
+      logs: 'Loading logs...',
+    },
+
+    backstageTemplate: '',
+
+    init() {
+      this.fetchClusterHealth();
+      this.fetchApps();
+      this.fetchOffers();
+      this.fetchRegistry();
+      this.loadBackstageTemplate();
+
+      // Poll cluster health & apps every 8 seconds
+      setInterval(() => {
+        this.fetchClusterHealth();
+        this.fetchApps();
+        this.fetchOffers();
+      }, 8000);
+    },
+
+    async fetchClusterHealth() {
       try {
-        const statusRes = await fetch('/api/v1/offers/monitoring/status');
-        state.monitoringStatus = await statusRes.json();
-      } catch (e) {
-        state.monitoringStatus = {};
+        const res = await fetch('/api/v1/health');
+        if (res.ok) {
+          this.cluster = await res.json();
+        } else {
+          this.cluster = { connected: false };
+        }
+      } catch (err) {
+        console.error('Failed to fetch cluster health:', err);
       }
-    } else {
-      state.monitoringStatus = {};
-    }
-    
-    renderOffers();
-  } catch (err) {
-    console.error('Failed to fetch offers:', err);
-  }
-}
+    },
 
-function renderApps() {
-  const container = document.getElementById('appsList');
-  const empty = document.getElementById('appsEmpty');
+    async fetchApps() {
+      try {
+        const res = await fetch('/api/v1/apps');
+        if (res.ok) {
+          const data = await res.json();
+          this.apps = Array.isArray(data) ? data : [];
+        }
+      } catch (err) {
+        console.error('Failed to fetch apps:', err);
+      }
+    },
 
-  if (state.apps.length === 0) {
-    container.innerHTML = '';
-    empty.style.display = 'block';
-    return;
-  }
+    async fetchOffers() {
+      try {
+        const res = await fetch('/api/v1/offers');
+        if (res.ok) {
+          const data = await res.json();
+          this.offers = Array.isArray(data) ? data : [];
 
-  empty.style.display = 'none';
-  container.innerHTML = state.apps.map(app => {
-    const statusBadge = app.status === 'Running' ? 'badge-success' : 'badge-warning';
-    const offersBadges = (app.linkedOffers || []).map(o => `
-      <span class="badge badge-offer" title="Bound at ${new Date(o.boundAt).toLocaleTimeString()}">
-        ${o.offerName}
-        <button onclick="handleUnlinkOffer('${app.name}', '${app.namespace}', '${o.offerId}', event)" style="background:none;border:none;color:#ef4444;cursor:pointer;margin-left:4px;font-weight:bold;">&times;</button>
-      </span>
-    `).join('');
+          // Fetch monitoring status if available
+          const hasMonitoring = this.offers.find(o => o.id === 'monitoring' && o.installed);
+          if (hasMonitoring) {
+            this.fetchMonitoringStatus();
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch offers:', err);
+      }
+    },
 
-    return `
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">${app.name}</div>
-            <span style="font-size:0.8rem;color:var(--text-secondary)">ns: ${app.namespace}</span>
-          </div>
-          <span class="badge ${statusBadge}">${app.status}</span>
-        </div>
+    async fetchMonitoringStatus() {
+      try {
+        const res = await fetch('/api/v1/offers/monitoring/status');
+        if (res.ok) {
+          this.monitoringStatus = await res.json();
+        }
+      } catch (err) {
+        console.error('Failed to fetch monitoring status:', err);
+      }
+    },
 
-        <div class="card-meta">
-          <span>Namespace: <strong style="color:var(--accent-cyan);">${app.namespace}</strong></span>
-          <span>Image: <strong>${app.image}</strong></span>
-          <span>Target Port: <strong>${app.port}</strong></span>
-          <span>Replicas: <strong>${app.readyCount} / ${app.replicas}</strong></span>
-          ${app.accessURL ? `<span>Live URL: <a href="${app.accessURL}" target="_blank" style="color:#38bdf8;font-weight:bold;text-decoration:underline;">${app.accessURL} ↗</a></span>` : ''}
-          ${app.nodePort ? `<span>NodePort: <strong>${app.nodePort}</strong></span>` : ''}
-          ${app.externalIP ? `<span>Tunnel IP: <strong>${app.externalIP}</strong></span>` : ''}
-          ${app.status !== 'Running' ? `<div style="background:rgba(239,68,68,0.15);border:1px solid rgba(239,68,68,0.3);border-radius:6px;padding:6px;font-size:0.8rem;color:#f87171;margin-top:6px;">⚠️ Aplicação reiniciando (${app.status}). Verifique se todas as ofertas (ex: banco de dados) foram vinculadas.</div>` : ''}
-        </div>
+    async fetchRegistry() {
+      try {
+        const res = await fetch('/api/v1/registry');
+        if (res.ok) {
+          this.registry = await res.json();
+        }
+      } catch (err) {
+        console.error('Failed to fetch registry config:', err);
+      }
+    },
 
-        <div class="card-offers">
-          <div class="card-offers-title">Linked Offers (${(app.linkedOffers || []).length})</div>
-          <div>${offersBadges || '<span style="font-size:0.8rem;color:#64748b">None linked</span>'}</div>
-        </div>
+    // Modal Control Helpers
+    openDeployModal() {
+      this.deployForm = {
+        name: '',
+        namespace: '',
+        image: '',
+        port: 80,
+        replicas: 1,
+        linkPostgres: false,
+        linkRedis: false,
+        linkKafka: false,
+        linkMonitoring: false,
+      };
+      if (this.registry && this.registry.enabled && this.registry.defaultPrefix) {
+        this.deployForm.image = this.registry.defaultPrefix + '/';
+      }
+      this.modals.deploy = true;
+    },
 
-        <div class="card-actions">
-          <button class="btn btn-outline btn-sm" onclick="openLinkOfferModal('${app.name}', '${app.namespace}')">+ Link Offer</button>
-          <button class="btn btn-outline btn-sm" onclick="viewAppDetails('${app.name}', '${app.namespace}')">Logs & Pods</button>
-          <button class="btn btn-danger btn-sm" onclick="handleDeleteApp('${app.name}', '${app.namespace}')">Delete</button>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
+    async openClusterModal() {
+      this.clusterForm = {
+        contextName: this.cluster.context || '',
+        externalName: '',
+        externalKubeconfig: '',
+      };
+      this.modals.cluster = true;
+      try {
+        const res = await fetch('/api/v1/cluster/contexts');
+        if (res.ok) {
+          const data = await res.json();
+          this.clusterContexts = data.contexts || [];
+          if (!this.clusterForm.contextName) {
+            this.clusterForm.contextName = data.current || '';
+          }
+        }
+      } catch (err) {
+        console.error('Failed to fetch contexts:', err);
+      }
+    },
 
-function renderOffers() {
-  const container = document.getElementById('offersList');
-  container.innerHTML = state.offers.map(offer => {
-    const isMonitoring = offer.id === 'monitoring';
-    const status = state.monitoringStatus || {};
-    return `
-      <div class="card">
-        <div class="card-header">
-          <div>
-            <div class="card-title">${offer.name}</div>
-            <span style="font-size:0.8rem;color:var(--accent-cyan);">${offer.category}</span>
-          </div>
-          <span class="badge ${offer.installed ? 'badge-success' : 'badge-warning'}">
-            ${offer.installed ? 'Cluster Ready' : 'Not Installed'}
-          </span>
-        </div>
+    openCustomOfferModal() {
+      this.customOfferForm = {
+        id: '',
+        name: '',
+        category: 'Database',
+        envPrefix: '',
+        image: '',
+        port: 80,
+        description: '',
+      };
+      this.modals.customOffer = true;
+    },
 
-        <p style="font-size:0.875rem;color:var(--text-secondary);line-height:1.5;margin-bottom:1.25rem;">
-          ${offer.description}
-        </p>
+    openLinkOfferModal(appName, appNamespace) {
+      this.linkForm = {
+        appName: appName,
+        appNamespace: appNamespace,
+        offerId: this.offers.length > 0 ? this.offers[0].id : '',
+        params: {},
+      };
+      this.modals.link = true;
+    },
 
-        ${isMonitoring ? `
-          <div style="background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:1rem;margin-bottom:1rem;">
-            <div style="font-size:0.85rem;font-weight:600;color:var(--text-primary);margin-bottom:0.75rem;">Components</div>
-            <div style="display:flex;flex-direction:column;gap:0.5rem;">
-              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;color:var(--text-secondary);">
-                <input type="checkbox" id="monitor-prometheus" ${status.prometheus ? 'checked' : ''} style="accent-color:var(--accent-cyan);">
-                <span><strong style="color:var(--text-primary);">Prometheus</strong> - Metrics collection & storage ${status.prometheus ? '<span style="color:#22c55e;font-size:0.75rem;">(installed)</span>' : ''}</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;color:var(--text-secondary);">
-                <input type="checkbox" id="monitor-grafana" ${status.grafana ? 'checked' : ''} style="accent-color:var(--accent-cyan);">
-                <span><strong style="color:var(--text-primary);">Grafana</strong> - Dashboards & visualization ${status.grafana ? '<span style="color:#22c55e;font-size:0.75rem;">(installed)</span>' : ''}</span>
-              </label>
-              <label style="display:flex;align-items:center;gap:0.5rem;cursor:pointer;font-size:0.85rem;color:var(--text-secondary);">
-                <input type="checkbox" id="monitor-otel" ${status.otel ? 'checked' : ''} style="accent-color:var(--accent-cyan);">
-                <span><strong style="color:var(--text-primary);">OpenTelemetry</strong> - Distributed tracing ${status.otel ? '<span style="color:#22c55e;font-size:0.75rem;">(installed)</span>' : ''}</span>
-              </label>
-            </div>
-          </div>
-        ` : ''}
+    closeModal(name) {
+      this.modals[name] = false;
+    },
 
-        <div class="card-meta">
-          <span>Version: <strong>${offer.version}</strong></span>
-          <span>Auto-Binding Envs: <strong>Supported</strong></span>
-        </div>
+    // Deployment logic
+    async handleDeployApp() {
+      const offersList = [];
+      if (this.deployForm.linkPostgres) offersList.push('postgresql');
+      if (this.deployForm.linkRedis) offersList.push('redis');
+      if (this.deployForm.linkKafka) offersList.push('kafka');
+      if (this.deployForm.linkMonitoring) offersList.push('monitoring');
 
-        <div class="card-actions">
-          ${isMonitoring ? `
-            <button class="btn btn-primary btn-sm" onclick="handleInstallMonitoring()">
-              ${offer.installed ? '⚡ Update Components' : '⚡ Install to Cluster'}
-            </button>
-          ` : `
-            ${!offer.installed ? `
-              <button class="btn btn-primary btn-sm" onclick="handleInstallOffer('${offer.id}')">
-                ⚡ Install to Cluster
-              </button>
-            ` : `
-              <button class="btn btn-outline btn-sm" disabled style="opacity:0.6;cursor:default;">
-                ✓ Installed
-              </button>
-            `}
-          `}
-          ${offer.id === 'monitoring' && offer.installed ? `
-            <a href="http://${window.location.hostname}:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
-              Open Grafana (30080) ↗
-            </a>
-            <span style="font-size:0.75rem;color:var(--text-secondary);" title="Grafana Credentials">
-              🔐 <code>admin</code> / <code>navispaas</code>
-            </span>
-          ` : ''}
-          ${offer.id === 'rabbitmq' && offer.installed ? `
-            <a href="http://${window.location.hostname}:30673" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
-              RabbitMQ UI (30673) ↗
-            </a>
-            <span style="font-size:0.75rem;color:var(--text-secondary);" title="RabbitMQ Credentials">
-              🔐 <code>guest</code> / <code>guest</code>
-            </span>
-          ` : ''}
-          ${offer.id === 'minio' && offer.installed ? `
-            <a href="http://${window.location.hostname}:30901" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
-              MinIO Console (30901) ↗
-            </a>
-            <span style="font-size:0.75rem;color:var(--text-secondary);" title="MinIO Credentials">
-              🔐 <code>minioadmin</code> / <code>minioadmin</code>
-            </span>
-          ` : ''}
-          ${['kafka','monitoring','redis','postgresql','mysql','mongodb','kong','nginx','rabbitmq','nats','minio'].indexOf(offer.id) === -1 ? `
-            <button class="btn btn-danger btn-sm" onclick="handleDeleteCustomOffer('${offer.id}')" title="Delete custom offer definition">
-              Delete
-            </button>
-          ` : ''}
-        </div>
-      </div>
-    `;
-  }).join('');
-}
+      const payload = {
+        name: this.deployForm.name.trim(),
+        namespace: this.deployForm.namespace.trim() || this.deployForm.name.trim(),
+        image: this.deployForm.image.trim(),
+        port: this.deployForm.port,
+        replicas: this.deployForm.replicas,
+        offers: offersList,
+      };
 
-async function fetchRegistry() {
-  try {
-    const res = await fetch('/api/v1/registry');
-    const data = await res.json();
-    state.registry = data;
-  } catch (err) {
-    console.error('Failed to fetch registry config:', err);
-  }
-}
+      try {
+        const res = await fetch('/api/v1/apps', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-function openRegistryModal() {
-  const reg = state.registry || {};
-  document.getElementById('regEnabled').checked = !!reg.enabled;
-  document.getElementById('regServer').value = reg.server || 'ghcr.io';
-  document.getElementById('regUsername').value = reg.username || '';
-  document.getElementById('regPassword').value = '';
-  document.getElementById('regDefaultPrefix').value = reg.defaultPrefix || '';
-  document.getElementById('registryModal').classList.add('open');
-}
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Deployment failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-async function handleSaveRegistry(e) {
-  e.preventDefault();
-  const enabled = document.getElementById('regEnabled').checked;
-  const server = document.getElementById('regServer').value.trim();
-  const username = document.getElementById('regUsername').value.trim();
-  const password = document.getElementById('regPassword').value.trim();
-  const email = document.getElementById('regEmail').value.trim();
-  const defaultPrefix = document.getElementById('regDefaultPrefix').value.trim();
+        this.closeModal('deploy');
+        this.fetchApps();
+      } catch (err) {
+        alert('Error deploying application: ' + err.message);
+      }
+    },
 
-  try {
-    const res = await fetch('/api/v1/registry', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ enabled, server, username, password, email, defaultPrefix })
-    });
+    // Offer Linking & Custom Params
+    getSelectedOfferParameters() {
+      const selected = this.offers.find(o => o.id === this.linkForm.offerId);
+      return (selected && selected.parameters) ? selected.parameters : [];
+    },
 
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Failed to save registry: ' + (err.error || res.statusText));
-      return;
-    }
+    async handleLinkOfferSubmit() {
+      const appName = this.linkForm.appName;
+      const appNamespace = this.linkForm.appNamespace;
+      const offerId = this.linkForm.offerId;
+      const parameters = {};
 
-    const data = await res.json();
-    state.registry = data.registry;
-    alert('Registry settings saved and synchronized to Kubernetes!');
-    closeModal('registryModal');
-  } catch (err) {
-    alert('Error saving registry: ' + err.message);
-  }
-}
+      const offer = this.offers.find(o => o.id === offerId);
+      if (offer && offer.parameters) {
+        offer.parameters.forEach(p => {
+          const val = this.linkForm.params[p.key];
+          if (val !== undefined && val !== '') {
+            parameters[p.key] = String(val);
+          } else if (p.default) {
+            parameters[p.key] = p.default;
+          }
+        });
+      }
 
-// Modal Handlers
-function openDeployModal() {
-  // If a default prefix is configured, show a helper hint in placeholder
-  if (state.registry && state.registry.enabled && state.registry.defaultPrefix) {
-    document.getElementById('appImage').placeholder = `e.g. order-service:v1 (auto-prepended with ${state.registry.defaultPrefix}/)`;
-  }
-  document.getElementById('deployModal').classList.add('open');
-}
+      try {
+        const url = appNamespace 
+          ? `/api/v1/apps/${appName}/links?namespace=${encodeURIComponent(appNamespace)}`
+          : `/api/v1/apps/${appName}/links`;
 
-function closeModal(modalId) {
-  document.getElementById(modalId).classList.remove('open');
-}
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ offerId, parameters })
+        });
 
-async function handleDeployApp(e) {
-  e.preventDefault();
-  const name = document.getElementById('appName').value.trim();
-  const namespace = document.getElementById('appNamespace').value.trim();
-  const image = document.getElementById('appImage').value.trim();
-  const port = parseInt(document.getElementById('appPort').value, 10);
-  const replicas = parseInt(document.getElementById('appReplicas').value, 10);
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Linking failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-  const offers = [];
-  if (document.getElementById('offerCheckMonitoring').checked) offers.push('monitoring');
-  if (document.getElementById('offerCheckKafka').checked) offers.push('kafka');
+        this.closeModal('link');
+        this.fetchApps();
+      } catch (err) {
+        alert('Error linking offer: ' + err.message);
+      }
+    },
 
-  try {
-    const payload = { name, image, port, replicas, offers };
-    if (namespace) payload.namespace = namespace;
+    async handleUnlinkOffer(appName, appNamespace, offerId) {
+      if (!confirm(`Are you sure you want to unlink '${offerId}' from '${appName}'?`)) return;
 
-    const res = await fetch('/api/v1/apps', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
-    });
+      try {
+        const url = appNamespace 
+          ? `/api/v1/apps/${appName}/links/${offerId}?namespace=${encodeURIComponent(appNamespace)}`
+          : `/api/v1/apps/${appName}/links/${offerId}`;
 
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Failed to deploy: ' + (err.error || res.statusText));
-      return;
-    }
+        const res = await fetch(url, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Unlinking failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-    closeModal('deployModal');
-    document.getElementById('deployForm').reset();
-    fetchApps();
-  } catch (err) {
-    alert('Error deploying app: ' + err.message);
-  }
-}
+        this.fetchApps();
+      } catch (err) {
+        alert('Error unlinking offer: ' + err.message);
+      }
+    },
 
-function openLinkOfferModal(appName, appNamespace) {
-  document.getElementById('linkAppTargetName').value = appName;
-  document.getElementById('linkAppTargetNamespace').value = appNamespace || '';
-  document.getElementById('linkOfferTitle').textContent = `Link Offer to '${appName}'`;
+    // Offer Cluster Installation
+    async handleInstallOffer(offerId) {
+      const provider = this.cluster.provider || 'kubernetes';
+      if (!confirm(`Install '${offerId}' cluster components onto ${provider}?`)) return;
 
-  const select = document.getElementById('linkOfferSelect');
-  select.innerHTML = state.offers.map(o => `<option value="${o.id}">${o.name} (${o.category})</option>`).join('');
+      try {
+        const res = await fetch(`/api/v1/offers/${offerId}/install`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Installation failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
+        alert(data.message || 'Installed successfully');
+        this.fetchOffers();
+      } catch (err) {
+        alert('Error initiating install: ' + err.message);
+      }
+    },
 
-  renderOfferParameters();
-  document.getElementById('linkOfferModal').classList.add('open');
-}
+    async handleInstallMonitoring() {
+      const promEl = document.getElementById('monitor-prometheus');
+      const grafEl = document.getElementById('monitor-grafana');
+      const otelEl = document.getElementById('monitor-otel');
 
-function renderOfferParameters() {
-  const offerId = document.getElementById('linkOfferSelect').value;
-  const offer = state.offers.find(o => o.id === offerId);
-  const container = document.getElementById('offerDynamicParams');
+      const prometheus = promEl ? promEl.checked : false;
+      const grafana = grafEl ? grafEl.checked : false;
+      const otel = otelEl ? otelEl.checked : false;
 
-  if (!offer || !offer.parameters || offer.parameters.length === 0) {
-    container.innerHTML = '<p style="color:var(--text-secondary);font-size:0.85rem;">No additional parameters required.</p>';
-    return;
-  }
+      if (!prometheus && !grafana && !otel) {
+        alert('Please select at least one component to install.');
+        return;
+      }
 
-  container.innerHTML = offer.parameters.map(param => `
-    <div class="form-group">
-      <label>${param.label} ${param.required ? '<span style="color:#ef4444">*</span>' : ''}</label>
-      <input type="${param.type === 'number' ? 'number' : 'text'}" 
-             name="param_${param.key}" 
-             class="form-control" 
-             value="${param.default || ''}" 
-             ${param.required ? 'required' : ''}>
-      <small style="color:#64748b;font-size:0.75rem;">${param.description}</small>
-    </div>
-  `).join('');
-}
+      const provider = this.cluster.provider || 'kubernetes';
+      if (!confirm(`Install selected monitoring components onto ${provider}?`)) return;
 
-async function handleLinkOfferSubmit(e) {
-  e.preventDefault();
-  const appName = document.getElementById('linkAppTargetName').value;
-  const appNamespace = document.getElementById('linkAppTargetNamespace').value;
-  const offerId = document.getElementById('linkOfferSelect').value;
-  const offer = state.offers.find(o => o.id === offerId);
+      try {
+        const res = await fetch('/api/v1/offers/monitoring/install', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ prometheus, grafana, otel })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Installation failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
+        alert(data.message || 'Installed successfully');
+        this.fetchOffers();
+      } catch (err) {
+        alert('Error starting monitoring install: ' + err.message);
+      }
+    },
 
-  const parameters = {};
-  if (offer && offer.parameters) {
-    offer.parameters.forEach(p => {
-      const input = document.querySelector(`[name="param_${p.key}"]`);
-      if (input) parameters[p.key] = input.value;
-    });
-  }
+    // Cluster contexts & kubeconfig paste
+    async handleSwitchContext() {
+      const contextName = this.clusterForm.contextName;
+      if (!contextName) return;
 
-  try {
-    const url = appNamespace 
-      ? `/api/v1/apps/${appName}/links?namespace=${encodeURIComponent(appNamespace)}`
-      : `/api/v1/apps/${appName}/links`;
+      try {
+        const res = await fetch('/api/v1/cluster/context', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contextName })
+        });
 
-    const res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ offerId, parameters })
-    });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Failed to switch context: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Failed to link offer: ' + (err.error || res.statusText));
-      return;
-    }
+        alert(`Switched active context to '${contextName}'!`);
+        this.closeModal('cluster');
+        this.fetchClusterHealth();
+        this.fetchApps();
+        this.fetchOffers();
+      } catch (err) {
+        alert('Error switching context: ' + err.message);
+      }
+    },
 
-    closeModal('linkOfferModal');
-    fetchApps();
-  } catch (err) {
-    alert('Error linking offer: ' + err.message);
-  }
-}
+    async handleSaveKubeconfig() {
+      const contextName = this.clusterForm.externalName.trim();
+      const kubeconfig = this.clusterForm.externalKubeconfig.trim();
 
-async function handleUnlinkOffer(appName, appNamespace, offerId, e) {
-  e.stopPropagation();
-  if (!confirm(`Are you sure you want to unlink '${offerId}' from '${appName}'?`)) return;
+      try {
+        const res = await fetch('/api/v1/cluster/kubeconfig', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ kubeconfig, contextName })
+        });
 
-  try {
-    const url = appNamespace 
-      ? `/api/v1/apps/${appName}/links/${offerId}?namespace=${encodeURIComponent(appNamespace)}`
-      : `/api/v1/apps/${appName}/links/${offerId}`;
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Failed to connect to cluster: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-    const res = await fetch(url, { method: 'DELETE' });
-    if (res.ok) fetchApps();
-  } catch (err) {
-    alert('Failed to unlink: ' + err.message);
-  }
-}
+        alert('Successfully connected to external cluster!');
+        this.closeModal('cluster');
+        this.fetchClusterHealth();
+        this.fetchApps();
+        this.fetchOffers();
+      } catch (err) {
+        alert('Error connecting: ' + err.message);
+      }
+    },
 
-async function handleDeleteApp(appName, appNamespace) {
-  if (!confirm(`Are you sure you want to delete application '${appName}'?`)) return;
+    // Custom offer creation
+    async handleCreateCustomOffer() {
+      const id = this.customOfferForm.id.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
+      const name = this.customOfferForm.name.trim();
+      const category = this.customOfferForm.category;
+      const envPrefix = this.customOfferForm.envPrefix.trim().toUpperCase();
+      const image = this.customOfferForm.image.trim();
+      const port = this.customOfferForm.port;
+      const description = this.customOfferForm.description.trim();
 
-  try {
-    const url = appNamespace 
-      ? `/api/v1/apps/${appName}?namespace=${encodeURIComponent(appNamespace)}`
-      : `/api/v1/apps/${appName}`;
+      const payload = { id, name, category, envPrefix, image, port, description, version: '1.0' };
 
-    const res = await fetch(url, { method: 'DELETE' });
-    if (res.ok) fetchApps();
-  } catch (err) {
-    alert('Failed to delete: ' + err.message);
-  }
-}
+      try {
+        const res = await fetch('/api/v1/offers/custom', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
 
-async function handleInstallOffer(offerId) {
-  const provider = state.cluster?.provider || 'kubernetes';
-  if (!confirm(`Install '${offerId}' cluster components onto ${provider}?`)) return;
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Failed to create offer: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-  try {
-    const res = await fetch(`/api/v1/offers/${offerId}/install`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({})
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert('Installation failed: ' + (data.detail || data.error || res.statusText));
-      return;
-    }
-    alert(data.message || 'Installed successfully');
-    fetchOffers();
-  } catch (err) {
-    alert('Installation failed: ' + err.message);
-  }
-}
+        alert(`Custom offer '${name}' created and registered!`);
+        this.closeModal('customOffer');
+        this.fetchOffers();
+      } catch (err) {
+        alert('Error creating offer: ' + err.message);
+      }
+    },
 
-async function handleInstallMonitoring() {
-  const prometheus = document.getElementById('monitor-prometheus')?.checked || false;
-  const grafana = document.getElementById('monitor-grafana')?.checked || false;
-  const otel = document.getElementById('monitor-otel')?.checked || false;
+    async handleDeleteCustomOffer(offerId) {
+      if (!confirm(`Are you sure you want to delete custom offer '${offerId}'?`)) return;
 
-  if (!prometheus && !grafana && !otel) {
-    alert('Please select at least one component to install.');
-    return;
-  }
+      try {
+        const res = await fetch(`/api/v1/offers/custom/${offerId}`, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Delete failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
+        this.fetchOffers();
+      } catch (err) {
+        alert('Error deleting custom offer: ' + err.message);
+      }
+    },
 
-  const components = [];
-  if (prometheus) components.push('Prometheus');
-  if (grafana) components.push('Grafana');
-  if (otel) components.push('OpenTelemetry');
+    // App logs & detailed info modal
+    async viewAppDetails(appName, appNamespace) {
+      this.appDetails = {
+        name: appName,
+        namespace: appNamespace,
+        pods: [],
+        envVars: {},
+        logs: 'Loading logs...',
+      };
+      this.modals.details = true;
+      this.refreshLogs();
 
-  const provider = state.cluster?.provider || 'kubernetes';
-  if (!confirm(`Install ${components.join(', ')} onto ${provider}?`)) return;
+      try {
+        const url = appNamespace 
+          ? `/api/v1/apps/${appName}?namespace=${encodeURIComponent(appNamespace)}`
+          : `/api/v1/apps/${appName}`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const details = await res.json();
+          this.appDetails.pods = details.pods || [];
+          this.appDetails.envVars = details.application?.envVars || {};
+        }
+      } catch (err) {
+        console.error('Failed to load app details:', err);
+      }
+    },
 
-  try {
-    const res = await fetch('/api/v1/offers/monitoring/install', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prometheus, grafana, otel })
-    });
-    const data = await res.json();
-    if (!res.ok) {
-      alert('Installation failed: ' + (data.detail || data.error || res.statusText));
-      return;
-    }
-    alert(data.message || 'Installed successfully');
-    fetchOffers();
-  } catch (err) {
-    alert('Installation failed: ' + err.message);
-  }
-}
+    async refreshLogs() {
+      if (!this.appDetails.name) return;
+      this.appDetails.logs = 'Fetching latest logs...';
+      try {
+        const url = this.appDetails.namespace 
+          ? `/api/v1/apps/${this.appDetails.name}/logs?lines=60&namespace=${encodeURIComponent(this.appDetails.namespace)}`
+          : `/api/v1/apps/${this.appDetails.name}/logs?lines=60`;
+        const res = await fetch(url);
+        if (res.ok) {
+          const data = await res.json();
+          this.appDetails.logs = data.logs || 'No logs available.';
+        } else {
+          this.appDetails.logs = 'Failed to fetch logs.';
+        }
+      } catch (err) {
+        this.appDetails.logs = 'Error fetching logs: ' + err.message;
+      }
+    },
 
-async function viewAppDetails(appName, appNamespace) {
-  state.currentDetailApp = appName;
-  state.currentDetailNamespace = appNamespace;
-  document.getElementById('detailAppTitle').textContent = `App Details: ${appName} (${appNamespace || ''})`;
-  document.getElementById('detailPodsList').innerHTML = 'Loading pods...';
-  document.getElementById('detailEnvVars').textContent = 'Loading envs...';
-  document.getElementById('detailLogs').textContent = 'Fetching logs...';
+    async handleDeleteApp(appName, appNamespace) {
+      if (!confirm(`Are you sure you want to delete application '${appName}'?`)) return;
 
-  document.getElementById('appDetailsModal').classList.add('open');
+      try {
+        const url = appNamespace 
+          ? `/api/v1/apps/${appName}?namespace=${encodeURIComponent(appNamespace)}`
+          : `/api/v1/apps/${appName}`;
 
-  try {
-    const url = appNamespace 
-      ? `/api/v1/apps/${appName}?namespace=${encodeURIComponent(appNamespace)}`
-      : `/api/v1/apps/${appName}`;
-    const res = await fetch(url);
-    const details = await res.json();
+        const res = await fetch(url, { method: 'DELETE' });
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Delete failed: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-    // Render pods
-    const pods = details.pods || [];
-    if (pods.length === 0) {
-      document.getElementById('detailPodsList').innerHTML = '<span style="color:#64748b">No active pods found.</span>';
-    } else {
-      document.getElementById('detailPodsList').innerHTML = pods.map(p => `
-        <div style="background:var(--bg-primary);padding:0.6rem;border-radius:6px;margin-bottom:0.4rem;display:flex;justify-content:space-between;font-size:0.85rem;">
-          <span><strong>${p.name}</strong> (${p.status})</span>
-          <span style="color:var(--text-secondary)">IP: ${p.ip || 'Pending'} | Restarts: ${p.restarts}</span>
-        </div>
-      `).join('');
-    }
+        this.fetchApps();
+      } catch (err) {
+        alert('Error deleting application: ' + err.message);
+      }
+    },
 
-    // Render env vars
-    const envs = details.application.envVars || {};
-    document.getElementById('detailEnvVars').textContent = Object.keys(envs).length > 0 
-      ? JSON.stringify(envs, null, 2) 
-      : 'No custom environment variables injected.';
+    // Save Registry config
+    async handleSaveRegistry() {
+      const enabled = document.getElementById('regEnabled').checked;
+      const server = document.getElementById('regServer').value.trim();
+      const username = document.getElementById('regUsername').value.trim();
+      const password = document.getElementById('regPassword').value.trim();
+      const email = document.getElementById('regEmail').value.trim();
+      const defaultPrefix = document.getElementById('regDefaultPrefix').value.trim();
 
-    // Fetch Logs
-    refreshCurrentLogs();
-  } catch (err) {
-    console.error(err);
-  }
-}
+      try {
+        const res = await fetch('/api/v1/registry', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ enabled, server, username, password, email, defaultPrefix })
+        });
 
-async function refreshCurrentLogs() {
-  if (!state.currentDetailApp) return;
-  try {
-    const url = state.currentDetailNamespace 
-      ? `/api/v1/apps/${state.currentDetailApp}/logs?lines=60&namespace=${encodeURIComponent(state.currentDetailNamespace)}`
-      : `/api/v1/apps/${state.currentDetailApp}/logs?lines=60`;
-    const res = await fetch(url);
-    const data = await res.json();
-    document.getElementById('detailLogs').textContent = data.logs || 'No logs available.';
-  } catch (err) {
-    document.getElementById('detailLogs').textContent = 'Error loading logs: ' + err.message;
-  }
-}
+        const data = await res.json();
+        if (!res.ok) {
+          alert('Failed to save registry: ' + (data.detail || data.error || res.statusText));
+          return;
+        }
 
-function loadBackstageTemplate() {
-  const templateYaml = `apiVersion: scaffolder.backstage.io/v1beta3
+        this.registry = data.registry || {};
+        alert('Registry settings saved and synchronized to cluster!');
+        this.closeModal('registry');
+      } catch (err) {
+        alert('Error saving registry: ' + err.message);
+      }
+    },
+
+    openRegistryModal() {
+      const reg = this.registry || {};
+      document.getElementById('regEnabled').checked = !!reg.enabled;
+      document.getElementById('regServer').value = reg.server || 'ghcr.io';
+      document.getElementById('regUsername').value = reg.username || '';
+      document.getElementById('regPassword').value = '';
+      document.getElementById('regDefaultPrefix').value = reg.defaultPrefix || '';
+      this.modals.registry = true;
+    },
+
+    loadBackstageTemplate() {
+      this.backstageTemplate = `apiVersion: scaffolder.backstage.io/v1beta3
 kind: Template
 metadata:
   name: navispaas-deploy-template
@@ -615,160 +636,6 @@ spec:
           offers:
             - \${{ parameters.enableKafka ? 'kafka' : '' }}
             - \${{ parameters.enableMonitoring ? 'monitoring' : '' }}`;
-
-  const el = document.getElementById('backstageTemplateCode');
-  if (el) el.textContent = templateYaml;
-}
-
-// Cluster Connection & Settings Handlers
-async function openClusterModal() {
-  document.getElementById('clusterModal').classList.add('open');
-  await fetchClusterContexts();
-}
-
-async function fetchClusterContexts() {
-  try {
-    const res = await fetch('/api/v1/cluster/contexts');
-    if (!res.ok) return;
-    const data = await res.json();
-    const select = document.getElementById('clusterContextSelect');
-    const contexts = data.contexts || [];
-    const current = data.current || '';
-
-    if (contexts.length === 0) {
-      select.innerHTML = '<option value="">No local contexts found</option>';
-      return;
     }
-
-    select.innerHTML = contexts.map(ctx => `
-      <option value="${ctx}" ${ctx === current ? 'selected' : ''}>
-        ${ctx} ${ctx === current ? '(active)' : ''}
-      </option>
-    `).join('');
-  } catch (err) {
-    console.error('Failed to fetch cluster contexts:', err);
-  }
-}
-
-async function handleSwitchContext() {
-  const select = document.getElementById('clusterContextSelect');
-  const contextName = select.value;
-  if (!contextName) return;
-
-  try {
-    const res = await fetch('/api/v1/cluster/context', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contextName })
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Failed to switch context: ' + (err.error || res.statusText));
-      return;
-    }
-
-    alert(`Switched to cluster context '${contextName}'!`);
-    closeModal('clusterModal');
-    fetchClusterHealth();
-    fetchApps();
-    fetchOffers();
-  } catch (err) {
-    alert('Error switching context: ' + err.message);
-  }
-}
-
-async function handleSaveKubeconfig(e) {
-  e.preventDefault();
-  const contextName = document.getElementById('extContextName').value.trim();
-  const kubeconfig = document.getElementById('extKubeconfigText').value.trim();
-
-  if (!kubeconfig) {
-    alert('Please paste a valid Kubeconfig YAML content.');
-    return;
-  }
-
-  try {
-    const res = await fetch('/api/v1/cluster/kubeconfig', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ kubeconfig, contextName })
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Failed to connect to external cluster: ' + (err.error || res.statusText));
-      return;
-    }
-
-    alert('Successfully connected to external cluster!');
-    closeModal('clusterModal');
-    document.getElementById('extKubeconfigText').value = '';
-    fetchClusterHealth();
-    fetchApps();
-    fetchOffers();
-  } catch (err) {
-    alert('Error connecting to external cluster: ' + err.message);
-  }
-}
-
-// Custom Offer Creation & Deletion Handlers
-function openCustomOfferModal() {
-  document.getElementById('customOfferModal').classList.add('open');
-}
-
-async function handleCreateCustomOffer(e) {
-  e.preventDefault();
-  const id = document.getElementById('custOfferID').value.trim().toLowerCase().replace(/[^a-z0-9-]/g, '');
-  const name = document.getElementById('custOfferName').value.trim();
-  const category = document.getElementById('custOfferCategory').value;
-  const envPrefix = document.getElementById('custOfferEnvPrefix').value.trim().toUpperCase();
-  const image = document.getElementById('custOfferImage').value.trim();
-  const port = parseInt(document.getElementById('custOfferPort').value, 10);
-  const description = document.getElementById('custOfferDesc').value.trim();
-
-  try {
-    const res = await fetch('/api/v1/offers/custom', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        id,
-        name,
-        category,
-        envPrefix,
-        image,
-        port,
-        description,
-        version: '1.0'
-      })
-    });
-
-    if (!res.ok) {
-      const err = await res.json();
-      alert('Failed to create custom offer: ' + (err.error || res.statusText));
-      return;
-    }
-
-    alert(`Custom offer '${name}' created successfully!`);
-    closeModal('customOfferModal');
-    fetchOffers();
-  } catch (err) {
-    alert('Error creating custom offer: ' + err.message);
-  }
-}
-
-async function handleDeleteCustomOffer(offerId) {
-  if (!confirm(`Are you sure you want to delete custom offer '${offerId}'?`)) return;
-
-  try {
-    const res = await fetch(`/api/v1/offers/custom/${offerId}`, { method: 'DELETE' });
-    if (res.ok) {
-      fetchOffers();
-    } else {
-      const err = await res.json();
-      alert('Failed to delete offer: ' + (err.error || res.statusText));
-    }
-  } catch (err) {
-    alert('Error deleting offer: ' + err.message);
-  }
+  };
 }

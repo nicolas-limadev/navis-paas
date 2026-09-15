@@ -1,373 +1,636 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NavisPaaS - Kubernetes Platform for Developers</title>
-  <link rel="stylesheet" href="/static/style.css">
-</head>
-<body>
+  <title>NavisPaaS - Developer-Centric Kubernetes Platform</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Alpine.js CDN -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-  <!-- Top Header -->
-  <header>
-    <div class="logo-group">
-      <div class="logo-icon">N</div>
-      <div class="logo-text">
-        <h1>NavisPaaS</h1>
-        <span>Kubernetes Platform Engine</span>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              navy: '#0f172a',
+              dark: '#020617',
+              cyan: '#06b6d4',
+              purple: '#8b5cf6',
+              accent: '#38bdf8'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    [x-cloak] { display: none !important; }
+    /* Custom scrollbar for terminal feel */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #020617; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="h-full flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-900" x-data="navisApp()" x-init="init()" x-cloak>
+
+  <!-- Top Navigation Header -->
+  <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex justify-between h-16 items-center">
+        
+        <!-- Logo -->
+        <div class="flex items-center space-x-3 cursor-pointer" @click="activeTab = 'apps'">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-purple-600 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-cyan-500/20">
+            N
+          </div>
+          <div>
+            <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-slate-300">NavisPaaS</h1>
+            <span class="text-xs text-cyan-400 font-semibold tracking-wider uppercase">Kubernetes Platform</span>
+          </div>
+        </div>
+
+        <!-- Connection Badges & Quick Actions -->
+        <div class="flex items-center space-x-4">
+          <!-- Cluster Status -->
+          <div @click="openClusterModal()" class="flex items-center space-x-2 bg-slate-800 hover:bg-slate-700/80 transition px-3.5 py-1.5 rounded-lg border border-slate-700 cursor-pointer text-sm">
+            <span class="w-2 h-2 rounded-full" :class="cluster.connected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'"></span>
+            <span class="font-medium text-slate-300" x-text="cluster.connected ? (cluster.provider ? cluster.provider.toUpperCase() : 'Kubernetes') : 'Disconnected'"></span>
+          </div>
+
+          <!-- Quick Actions -->
+          <button @click="openRegistryModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-3.5 py-1.5 rounded-lg border border-slate-700 transition text-sm flex items-center space-x-2">
+            <i class="fa-solid fa-key text-cyan-400"></i>
+            <span>Registry</span>
+          </button>
+
+          <button @click="openDeployModal()" class="bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-semibold px-4 py-2 rounded-lg shadow-lg shadow-cyan-500/10 transition text-sm flex items-center space-x-2">
+            <i class="fa-solid fa-rocket"></i>
+            <span>Deploy App</span>
+          </button>
+        </div>
+
       </div>
-    </div>
-    <div class="header-status">
-      <div class="cluster-badge" id="clusterStatusBadge" onclick="openClusterModal()" style="cursor:pointer;" title="Click to switch cluster or connect Raspberry Pi / Remote K8s">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="clusterStatusText">Connecting...</span>
-      </div>
-      <button class="btn btn-outline" onclick="openClusterModal()" title="Connect to external cluster / Raspberry Pi">
-        🔌 Cluster Settings
-      </button>
-      <button class="btn btn-outline" onclick="openRegistryModal()" title="Configure Docker Registry & Secrets">
-        🔐 Registry
-      </button>
-      <button class="btn btn-primary" onclick="openDeployModal()">
-        <span>+</span> Deploy Application
-      </button>
     </div>
   </header>
 
-  <!-- Main Container -->
-  <div class="container">
-    <!-- Navigation Tabs -->
-    <nav class="nav-tabs">
-      <button class="nav-tab active" onclick="switchTab('apps')">📦 Applications</button>
-      <button class="nav-tab" onclick="switchTab('offers')">🧩 Offers Catalog (Database & Monitoring)</button>
-      <button class="nav-tab" onclick="switchTab('backstage')">🎭 Backstage Integration</button>
-    </nav>
+  <!-- Navigation Tabs Subheader -->
+  <div class="border-b border-slate-800 bg-slate-900/20">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <nav class="flex space-x-8 h-12" aria-label="Tabs">
+        <button @click="activeTab = 'apps'" :class="activeTab === 'apps' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-300'" class="border-b-2 py-3 px-1 text-sm font-medium transition flex items-center space-x-2">
+          <i class="fa-solid fa-cubes text-xs"></i>
+          <span>Applications</span>
+          <span class="bg-slate-800 text-slate-300 ml-1.5 px-2 py-0.5 rounded-full text-xs" x-text="apps.length"></span>
+        </button>
+        <button @click="activeTab = 'offers'" :class="activeTab === 'offers' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-300'" class="border-b-2 py-3 px-1 text-sm font-medium transition flex items-center space-x-2">
+          <i class="fa-solid fa-puzzle-piece text-xs"></i>
+          <span>Offers Catalog</span>
+        </button>
+        <button @click="activeTab = 'backstage'" :class="activeTab === 'backstage' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-slate-300'" class="border-b-2 py-3 px-1 text-sm font-medium transition flex items-center space-x-2">
+          <i class="fa-solid fa-masks-theater text-xs"></i>
+          <span>Backstage Integration</span>
+        </button>
+      </nav>
+    </div>
+  </div>
 
+  <!-- Main Content Area -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 overflow-y-auto">
+    
     <!-- Tab 1: Applications -->
-    <section id="apps-tab" class="tab-content active">
-      <div id="appsList" class="cards-grid">
-        <!-- Rendered dynamically via JS -->
+    <template x-if="activeTab === 'apps'">
+      <div>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-show="apps.length > 0">
+          <template x-for="app in apps" :key="app.name">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition duration-200 flex flex-col justify-between shadow-xl shadow-slate-950/50">
+              
+              <!-- Card Header -->
+              <div class="p-6 border-b border-slate-800/60 bg-slate-900/40">
+                <div class="flex justify-between items-start">
+                  <div>
+                    <h3 class="text-lg font-bold text-white tracking-tight" x-text="app.name"></h3>
+                    <span class="text-xs font-mono text-cyan-400" x-text="'ns: ' + app.namespace"></span>
+                  </div>
+                  <span class="px-2.5 py-0.5 rounded-full text-xs font-semibold"
+                        :class="{
+                          'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20': app.status === 'Running',
+                          'bg-amber-500/10 text-amber-400 border border-amber-500/20': app.status !== 'Running'
+                        }"
+                        x-text="app.status">
+                  </span>
+                </div>
+
+                <div class="mt-4 space-y-2 text-sm text-slate-400">
+                  <div class="flex justify-between"><span class="text-slate-500">Image:</span> <span class="font-mono text-xs max-w-[200px] truncate" :title="app.image" x-text="app.image"></span></div>
+                  <div class="flex justify-between"><span class="text-slate-500">Port:</span> <span class="font-semibold text-slate-300" x-text="app.port"></span></div>
+                  <div class="flex justify-between"><span class="text-slate-500">Replicas:</span> <span class="font-semibold text-slate-300" x-text="app.readyCount + ' / ' + app.replicas"></span></div>
+                  <template x-if="app.accessURL">
+                    <div class="flex justify-between items-center"><span class="text-slate-500">Live URL:</span> <a :href="app.accessURL" target="_blank" class="text-cyan-400 hover:underline font-semibold flex items-center space-x-1"><span>Open</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a></div>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Linked Addons -->
+              <div class="px-6 py-4 bg-slate-900/20 border-b border-slate-800/30 flex-1">
+                <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Linked Offers</div>
+                <div class="flex flex-wrap gap-2">
+                  <template x-if="!app.linkedOffers || app.linkedOffers.length === 0">
+                    <span class="text-xs text-slate-500 italic">No offers linked</span>
+                  </template>
+                  <template x-for="offer in app.linkedOffers" :key="offer.offerId">
+                    <span class="inline-flex items-center px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs font-semibold text-cyan-300">
+                      <span x-text="offer.offerName"></span>
+                      <button @click="handleUnlinkOffer(app.name, app.namespace, offer.offerId)" class="ml-1.5 text-rose-500 hover:text-rose-400 font-bold focus:outline-none">&times;</button>
+                    </span>
+                  </template>
+                </div>
+              </div>
+
+              <!-- Card Actions -->
+              <div class="p-6 bg-slate-900/60 flex justify-between gap-3">
+                <button @click="openLinkOfferModal(app.name, app.namespace)" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5">
+                  <i class="fa-solid fa-link text-cyan-400"></i>
+                  <span>Link Offer</span>
+                </button>
+                <button @click="viewAppDetails(app.name, app.namespace)" class="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5">
+                  <i class="fa-solid fa-terminal text-purple-400"></i>
+                  <span>Logs & Pods</span>
+                </button>
+                <button @click="handleDeleteApp(app.name, app.namespace)" class="bg-rose-950/40 hover:bg-rose-900/50 border border-rose-800/30 text-rose-400 p-2 rounded-lg transition text-xs" title="Delete Application">
+                  <i class="fa-solid fa-trash"></i>
+                </button>
+              </div>
+
+            </div>
+          </template>
+        </div>
+
+        <!-- Empty State -->
+        <div class="max-w-md mx-auto text-center py-20" x-show="apps.length === 0">
+          <div class="w-16 h-16 bg-slate-900 rounded-full border border-slate-800 flex items-center justify-center mx-auto mb-4">
+            <i class="fa-solid fa-cubes text-2xl text-slate-600"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">No applications deployed yet</h3>
+          <p class="text-sm text-slate-400 mt-2 mb-6">Deploy your first containerized microservice and link database, messaging or ingress with zero Kubernetes YAML boilerplate.</p>
+          <button @click="openDeployModal()" class="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-5 py-2.5 rounded-lg shadow-lg shadow-cyan-500/10 transition text-sm">
+            Deploy Sample App
+          </button>
+        </div>
       </div>
-      <div id="appsEmpty" class="empty-state" style="display: none;">
-        <h3>No applications deployed yet</h3>
-        <p>Deploy your first microservice and link Kafka or Monitoring in one click.</p>
-        <button class="btn btn-primary" onclick="openDeployModal()">Deploy Sample App</button>
-      </div>
-    </section>
+    </template>
 
     <!-- Tab 2: Offers Catalog -->
-    <section id="offers-tab" class="tab-content">
-      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
-        <div>
-          <h2 style="font-size: 1.25rem; color: var(--text-primary);">Infrastructure Offers Catalog</h2>
-          <p style="font-size: 0.85rem; color: var(--text-secondary);">Core infrastructure and custom dynamic offers with automated service binding.</p>
+    <template x-if="activeTab === 'offers'">
+      <div>
+        <div class="flex justify-between items-center mb-6">
+          <div>
+            <h2 class="text-lg font-bold text-white tracking-tight">Infrastructure Catalog</h2>
+            <p class="text-sm text-slate-400">Install core database, messaging, gateway servers or build your own custom dynamic offers.</p>
+          </div>
+          <button @click="openCustomOfferModal()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg transition text-sm flex items-center space-x-2">
+            <i class="fa-solid fa-plus text-cyan-400"></i>
+            <span>Create Custom Offer</span>
+          </button>
         </div>
-        <button class="btn btn-outline" onclick="openCustomOfferModal()">
-          <span>+</span> Create Custom Offer
-        </button>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <template x-for="offer in offers" :key="offer.id">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 hover:border-slate-700 transition flex flex-col justify-between shadow-xl shadow-slate-950/50">
+              
+              <div>
+                <!-- Offer Header -->
+                <div class="flex justify-between items-start mb-4">
+                  <div>
+                    <h3 class="text-md font-bold text-white" x-text="offer.name"></h3>
+                    <span class="text-xs text-cyan-400 font-semibold uppercase tracking-wider" x-text="offer.category"></span>
+                  </div>
+                  <span class="px-2 py-0.5 rounded-full text-[10px] font-bold"
+                        :class="offer.installed ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'"
+                        x-text="offer.installed ? 'Ready' : 'Not Installed'">
+                  </span>
+                </div>
+
+                <p class="text-sm text-slate-400 leading-relaxed mb-6" x-text="offer.description"></p>
+
+                <!-- Dynamic Monitoring Details -->
+                <template x-if="offer.id === 'monitoring'">
+                  <div class="bg-slate-950 border border-slate-800 rounded-lg p-3.5 mb-6 space-y-2">
+                    <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Cluster Components</div>
+                    <div class="flex flex-col gap-2">
+                      <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" id="monitor-prometheus" :checked="monitoringStatus.prometheus" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                        <span><strong>Prometheus</strong> - Metrics Poller <span class="text-emerald-400 ml-1" x-show="monitoringStatus.prometheus">(installed)</span></span>
+                      </label>
+                      <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" id="monitor-grafana" :checked="monitoringStatus.grafana" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                        <span><strong>Grafana</strong> - Dashboards <span class="text-emerald-400 ml-1" x-show="monitoringStatus.grafana">(installed)</span></span>
+                      </label>
+                      <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
+                        <input type="checkbox" id="monitor-otel" :checked="monitoringStatus.otel" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                        <span><strong>OpenTelemetry</strong> - Tracing <span class="text-emerald-400 ml-1" x-show="monitoringStatus.otel">(installed)</span></span>
+                      </label>
+                    </div>
+                  </div>
+                </template>
+
+                <div class="text-xs text-slate-500 space-y-1 mb-6">
+                  <div>Version: <strong class="text-slate-300" x-text="offer.version"></strong></div>
+                  <div>Auto-Injected Envs: <strong class="text-slate-300">Supported</strong></div>
+                </div>
+              </div>
+
+              <!-- Actions -->
+              <div class="flex flex-col gap-3">
+                <template x-if="offer.id === 'monitoring'">
+                  <button @click="handleInstallMonitoring()" class="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-cyan-500/5">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span x-text="offer.installed ? 'Update Components' : 'Install to Cluster'"></span>
+                  </button>
+                </template>
+                <template x-if="offer.id !== 'monitoring' && !offer.installed">
+                  <button @click="handleInstallOffer(offer.id)" class="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-cyan-500/5">
+                    <i class="fa-solid fa-bolt"></i>
+                    <span>Install to Cluster</span>
+                  </button>
+                </template>
+                <template x-if="offer.id !== 'monitoring' && offer.installed">
+                  <button class="w-full bg-slate-800 text-slate-500 font-semibold py-2 rounded-lg border border-slate-700 text-xs cursor-default" disabled>
+                    <i class="fa-solid fa-check text-emerald-500 mr-1.5"></i>
+                    <span>Installed</span>
+                  </button>
+                </template>
+
+                <!-- UI Management Links with Credentials -->
+                <div class="mt-2 space-y-2">
+                  <template x-if="offer.id === 'monitoring' && offer.installed">
+                    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                      <a :href="'http://' + window.location.hostname + ':30080'" target="_blank" class="text-xs text-cyan-400 hover:underline font-bold flex items-center space-x-1">
+                        <span>Open Grafana (30080)</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                      </a>
+                      <span class="text-[10px] text-slate-500 font-mono">admin / navispaas</span>
+                    </div>
+                  </template>
+                  <template x-if="offer.id === 'rabbitmq' && offer.installed">
+                    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                      <a :href="'http://' + window.location.hostname + ':30673'" target="_blank" class="text-xs text-cyan-400 hover:underline font-bold flex items-center space-x-1">
+                        <span>RabbitMQ UI (30673)</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                      </a>
+                      <span class="text-[10px] text-slate-500 font-mono">guest / guest</span>
+                    </div>
+                  </template>
+                  <template x-if="offer.id === 'minio' && offer.installed">
+                    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                      <a :href="'http://' + window.location.hostname + ':30901'" target="_blank" class="text-xs text-cyan-400 hover:underline font-bold flex items-center space-x-1">
+                        <span>MinIO Console (30901)</span>
+                        <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+                      </a>
+                      <span class="text-[10px] text-slate-500 font-mono">minioadmin / minioadmin</span>
+                    </div>
+                  </template>
+                </div>
+
+                <!-- Custom Offers Delete Button -->
+                <template x-if="['kafka','monitoring','redis','postgresql','mysql','mongodb','kong','nginx','rabbitmq','nats','minio'].indexOf(offer.id) === -1">
+                  <button @click="handleDeleteCustomOffer(offer.id)" class="w-full bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 border border-rose-900/30 font-semibold py-1.5 rounded-lg transition text-xs">
+                    Delete Custom Offer
+                  </button>
+                </template>
+              </div>
+
+            </div>
+          </template>
+        </div>
       </div>
-      <div id="offersList" class="cards-grid">
-        <!-- Rendered dynamically via JS -->
-      </div>
-    </section>
+    </template>
 
     <!-- Tab 3: Backstage Integration -->
-    <section id="backstage-tab" class="tab-content">
-      <div class="card" style="margin-bottom: 2rem;">
-        <h2 style="margin-bottom: 0.75rem;">🎭 How Backstage Integrates with NavisPaaS</h2>
-        <p style="color: var(--text-secondary); line-height: 1.6; margin-bottom: 1rem;">
-          NavisPaaS provides the execution and service binding engine, while <strong>Spotify Backstage</strong> serves as your Developer Portal.
-          Developers can use Backstage Scaffolder templates to spin up a service and have it automatically configured on your Kubernetes cluster with Kafka and Monitoring.
-        </p>
-        <div style="display: flex; gap: 1rem; margin-top: 1rem;">
-          <a href="/api/v1/openapi.json" target="_blank" class="btn btn-outline btn-sm">OpenAPI Spec (JSON)</a>
-          <a href="#template-preview" class="btn btn-outline btn-sm">View Scaffolder Template</a>
+    <template x-if="activeTab === 'backstage'">
+      <div class="space-y-6">
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl shadow-slate-950/50">
+          <h2 class="text-lg font-bold text-white mb-2 flex items-center space-x-2">
+            <i class="fa-solid fa-masks-theater text-purple-400"></i>
+            <span>Spotify Backstage Developer Portal Integration</span>
+          </h2>
+          <p class="text-slate-400 text-sm leading-relaxed max-w-3xl">
+            NavisPaaS acts as your localized execution and binding engine, while <strong>Spotify Backstage</strong> serves as your Developer Portal. 
+            Plug our ready-to-use Scaffolder template to give developers a self-service form to deploy services in 1 click.
+          </p>
+          <div class="flex gap-4 mt-6">
+            <a href="/api/v1/openapi.json" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold px-4 py-2 rounded-lg transition text-sm flex items-center space-x-2">
+              <i class="fa-solid fa-file-code text-cyan-400"></i>
+              <span>Download OpenAPI Spec (JSON)</span>
+            </a>
+            <a :href="'http://' + window.location.hostname + ':8080/api/v1/docs'" target="_blank" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold px-4 py-2 rounded-lg transition text-sm flex items-center space-x-2">
+              <i class="fa-solid fa-book text-purple-400"></i>
+              <span>Explore Interactive API Swagger</span>
+            </a>
+          </div>
+        </div>
+
+        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-xl shadow-slate-950/50">
+          <h3 class="text-md font-bold text-white mb-2">Backstage Scaffolder Template (template.yaml)</h3>
+          <p class="text-sm text-slate-400 mb-4">Add this YAML directly to your Backstage Catalog locations to register the template:</p>
+          <pre class="bg-slate-950 border border-slate-800 p-4 rounded-lg text-xs font-mono text-cyan-300 overflow-x-auto max-h-96" x-text="backstageTemplate"></pre>
         </div>
       </div>
+    </template>
 
-      <div class="card" id="template-preview">
-        <h3 style="margin-bottom: 1rem;">Backstage Scaffolder Template (template.yaml)</h3>
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
-          Drop this template into your Backstage catalog to give developers a self-service form:
-        </p>
-        <div class="code-box" id="backstageTemplateCode">Loading template...</div>
+  </main>
+
+  <!-- Modals -->
+
+  <!-- Modal: Deploy App -->
+  <div class="modal-backdrop bg-slate-950/80 backdrop-blur-sm fixed inset-0 flex items-center justify-center z-50 p-4" x-show="modals.deploy" @click.self="closeModal('deploy')">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <h3 class="text-lg font-bold text-white">Deploy Application</h3>
+        <button @click="closeModal('deploy')" class="text-slate-400 hover:text-white text-xl">&times;</button>
       </div>
-    </section>
-  </div>
 
-  <!-- Deploy App Modal -->
-  <div class="modal-backdrop" id="deployModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2>Deploy New Application</h2>
-        <button class="modal-close" onclick="closeModal('deployModal')">&times;</button>
-      </div>
-      <form id="deployForm" onsubmit="handleDeployApp(event)">
-        <div class="form-group">
-          <label>Application Name</label>
-          <input type="text" id="appName" class="form-control" placeholder="e.g. order-service" required>
-        </div>
-        <div class="form-group">
-          <label>Namespace (Optional)</label>
-          <input type="text" id="appNamespace" class="form-control" placeholder="Default: dedicated namespace with app name">
-          <small style="color:#64748b;font-size:0.75rem;">Leave blank to automatically create a dedicated isolated namespace.</small>
-        </div>
-        <div class="form-group">
-          <label>Container Image</label>
-          <input type="text" id="appImage" class="form-control" placeholder="e.g. hashicorp/http-echo:0.2.3 or nginx:alpine" required>
-        </div>
-        <div class="form-group">
-          <label>Target Container Port</label>
-          <input type="number" id="appPort" class="form-control" value="5678" required>
-        </div>
-        <div class="form-group">
-          <label>Replicas</label>
-          <input type="number" id="appReplicas" class="form-control" value="1" min="1" max="10">
+      <form @submit.prevent="handleDeployApp()">
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">App Name</label>
+              <input type="text" x-model="deployForm.name" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. order-service" required>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Namespace (Optional)</label>
+              <input type="text" x-model="deployForm.namespace" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="Default: app name">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Docker Image</label>
+            <input type="text" x-model="deployForm.image" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. nginx:alpine" required>
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Target Port</label>
+              <input type="number" x-model.number="deployForm.port" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="80" required>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Replicas</label>
+              <input type="number" x-model.number="deployForm.replicas" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" min="1" required>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-2">Link Core Offers Instantly</label>
+            <div class="grid grid-cols-2 gap-3 bg-slate-950 p-4 rounded-lg border border-slate-800">
+              <label class="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
+                <input type="checkbox" x-model="deployForm.linkPostgres" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                <span>PostgreSQL</span>
+              </label>
+              <label class="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
+                <input type="checkbox" x-model="deployForm.linkRedis" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                <span>Redis</span>
+              </label>
+              <label class="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
+                <input type="checkbox" x-model="deployForm.linkKafka" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                <span>Apache Kafka</span>
+              </label>
+              <label class="flex items-center space-x-2 text-sm text-slate-300 cursor-pointer">
+                <input type="checkbox" x-model="deployForm.linkMonitoring" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                <span>Observability</span>
+              </label>
+            </div>
+          </div>
         </div>
 
-        <div class="form-group" style="margin-top: 1.5rem;">
-          <label>Auto-Link Offers on Launch</label>
-          <label class="form-checkbox">
-            <input type="checkbox" id="offerCheckMonitoring" checked>
-            <span>📊 <strong>Observability Stack</strong> (Prometheus metrics & Grafana dashboard)</span>
-          </label>
-          <label class="form-checkbox">
-            <input type="checkbox" id="offerCheckKafka" checked>
-            <span>⚡ <strong>Apache Kafka</strong> (Auto-inject bootstrap servers & topic vars)</span>
-          </label>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem;">
-          <button type="button" class="btn btn-outline" onclick="closeModal('deployModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Deploy to Kubernetes</button>
+        <div class="flex justify-end gap-3 border-t border-slate-800 pt-4 mt-6">
+          <button type="button" @click="closeModal('deploy')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg transition text-sm">Cancel</button>
+          <button type="submit" class="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg shadow-lg shadow-cyan-500/5 transition text-sm">Deploy Application</button>
         </div>
       </form>
     </div>
   </div>
 
-  <!-- Link Offer Modal -->
-  <div class="modal-backdrop" id="linkOfferModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 id="linkOfferTitle">Link Offer to App</h2>
-        <button class="modal-close" onclick="closeModal('linkOfferModal')">&times;</button>
-      </div>
-      <form id="linkOfferForm" onsubmit="handleLinkOfferSubmit(event)">
-        <input type="hidden" id="linkAppTargetName">
-        <input type="hidden" id="linkAppTargetNamespace">
-        <div class="form-group">
-          <label>Select Offer</label>
-          <select id="linkOfferSelect" class="form-control" onchange="renderOfferParameters()">
-            <!-- Populated via JS -->
-          </select>
-        </div>
-
-        <div id="offerDynamicParams">
-          <!-- Populated based on offer selection -->
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 2rem;">
-          <button type="button" class="btn btn-outline" onclick="closeModal('linkOfferModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Attach Offer & Inject Envs</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- App Details & Pods Modal -->
-  <div class="modal-backdrop" id="appDetailsModal">
-    <div class="modal" style="max-width: 750px;">
-      <div class="modal-header">
-        <h2 id="detailAppTitle">Application Details</h2>
-        <button class="modal-close" onclick="closeModal('appDetailsModal')">&times;</button>
-      </div>
-      
-      <div style="margin-bottom: 1.5rem;">
-        <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Running Pods</h4>
-        <div id="detailPodsList" style="margin-bottom: 1.5rem;"></div>
-
-        <h4 style="color: var(--text-secondary); margin-bottom: 0.5rem;">Injected Environment Variables</h4>
-        <div class="code-box" id="detailEnvVars" style="max-height: 140px; margin-bottom: 1.5rem;"></div>
-
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-          <h4 style="color: var(--text-secondary);">Pod Logs (Live Stream)</h4>
-          <button class="btn btn-outline btn-sm" onclick="refreshCurrentLogs()">Refresh Logs</button>
-        </div>
-        <div class="code-box" id="detailLogs" style="max-height: 200px;">Loading logs...</div>
+  <!-- Modal: Switch Cluster Context / Kubeconfig Settings -->
+  <div class="modal-backdrop bg-slate-950/80 backdrop-blur-sm fixed inset-0 flex items-center justify-center z-50 p-4" x-show="modals.cluster" @click.self="closeModal('cluster')">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-xl w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i class="fa-solid fa-network-wired text-cyan-400"></i>
+          <span>Cluster Connection & Settings</span>
+        </h3>
+        <button @click="closeModal('cluster')" class="text-slate-400 hover:text-white text-xl">&times;</button>
       </div>
 
-      <div style="display: flex; justify-content: flex-end;">
-        <button class="btn btn-outline" onclick="closeModal('appDetailsModal')">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Private Registry Modal -->
-  <div class="modal-backdrop" id="registryModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h2>Docker Registry Settings</h2>
-        <button class="modal-close" onclick="closeModal('registryModal')">&times;</button>
-      </div>
-      <form id="registryForm" onsubmit="handleSaveRegistry(event)">
-        <div class="form-group">
-          <label class="form-checkbox">
-            <input type="checkbox" id="regEnabled">
-            <span><strong>Enable Private Registry Authentication</strong></span>
-          </label>
-        </div>
-
-        <div class="form-group">
-          <label>Registry Server</label>
-          <input type="text" id="regServer" class="form-control" placeholder="e.g. ghcr.io, docker.io, registry.gitlab.com" value="ghcr.io">
-        </div>
-
-        <div class="form-group">
-          <label>Username / Robot Account</label>
-          <input type="text" id="regUsername" class="form-control" placeholder="e.g. github-username or robot$org">
-        </div>
-
-        <div class="form-group">
-          <label>Password / Access Token (PAT)</label>
-          <input type="password" id="regPassword" class="form-control" placeholder="Leave empty to keep existing password">
-        </div>
-
-        <div class="form-group">
-          <label>Email (Optional)</label>
-          <input type="email" id="regEmail" class="form-control" placeholder="dev@company.com">
-        </div>
-
-        <div class="form-group">
-          <label>Default Registry Prefix (Optional)</label>
-          <input type="text" id="regDefaultPrefix" class="form-control" placeholder="e.g. ghcr.io/my-org">
-          <small style="color:#64748b;font-size:0.75rem;">When defined, entering 'api:v1' automatically becomes 'ghcr.io/my-org/api:v1'.</small>
-        </div>
-
-        <div style="background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.3); border-radius: 8px; padding: 0.85rem; font-size: 0.8rem; color: #93c5fd; margin-bottom: 1.5rem;">
-          💡 <strong>Local Images Tip:</strong> For local images without pushing to any remote registry, use your provider's Docker environment (e.g., <code>eval $(minikube docker-env)</code> for Minikube). NavisPaaS configures <code>imagePullPolicy: IfNotPresent</code> so local images are used instantly.
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem;">
-          <button type="button" class="btn btn-outline" onclick="closeModal('registryModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Save & Sync Secret</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- Cluster Settings / External Cluster / Raspberry Pi Modal -->
-  <div class="modal-backdrop" id="clusterModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>🔌 Cluster Connection & Settings</h3>
-        <button class="close-btn" onclick="closeModal('clusterModal')">&times;</button>
-      </div>
-
-      <div style="margin-bottom: 1.5rem;">
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1rem;">
-          Connect NavisPaaS to a local cluster or an external cluster (e.g. <strong>Raspberry Pi k3s cluster</strong>, Remote K8s, EKS, GKE, AKS).
-        </p>
-
-        <!-- Option A: Switch Kubeconfig Context -->
-        <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; margin-bottom: 1rem;">
-          <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-primary);">Switch Kubeconfig Context</h4>
-          <div style="display: flex; gap: 0.5rem;">
-            <select id="clusterContextSelect" class="form-control" style="flex: 1;">
-              <option value="">Loading contexts...</option>
+      <div class="space-y-5">
+        <!-- Switch Context -->
+        <div class="bg-slate-950 border border-slate-850 p-4 rounded-xl">
+          <label class="block text-xs font-semibold text-slate-400 mb-2">Switch Active Kubeconfig Context</label>
+          <div class="flex gap-2">
+            <select x-model="clusterForm.contextName" class="flex-1 bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none">
+              <template x-for="ctx in clusterContexts" :key="ctx">
+                <option :value="ctx" x-text="ctx"></option>
+              </template>
             </select>
-            <button class="btn btn-primary btn-sm" onclick="handleSwitchContext()">Switch Context</button>
+            <button @click="handleSwitchContext()" class="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm shadow-md transition">Switch</button>
           </div>
         </div>
 
-        <!-- Option B: Connect External Cluster via Kubeconfig Paste -->
-        <div style="background: var(--bg-primary); border: 1px solid var(--border); border-radius: 8px; padding: 1rem;">
-          <h4 style="font-size: 0.9rem; margin-bottom: 0.5rem; color: var(--text-primary);">Connect External Cluster (Paste Kubeconfig / Raspberry Pi)</h4>
-          <form onsubmit="handleSaveKubeconfig(event)">
-            <div class="form-group" style="margin-bottom: 0.75rem;">
-              <label>Custom Context Name</label>
-              <input type="text" id="extContextName" class="form-control" placeholder="e.g. raspberry-pi-k3s">
-            </div>
-            <div class="form-group" style="margin-bottom: 0.75rem;">
-              <label>Kubeconfig YAML Content</label>
-              <textarea id="extKubeconfigText" class="form-control" rows="6" style="font-family: monospace; font-size: 0.8rem;" placeholder="apiVersion: v1&#10;clusters:&#10;- cluster:&#10;    server: https://192.168.1.100:6443&#10;..." required></textarea>
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm" style="width: 100%;">⚡ Connect to External Cluster</button>
-          </form>
-        </div>
+        <!-- Connect External Cluster -->
+        <form @submit.prevent="handleSaveKubeconfig()" class="bg-slate-950 border border-slate-850 p-4 rounded-xl space-y-4">
+          <div class="text-xs font-semibold text-slate-400">Connect External Raspberry Pi / Remote K8s</div>
+          <div>
+            <label class="block text-[11px] text-slate-500 mb-1">Custom Context Name</label>
+            <input type="text" x-model="clusterForm.externalName" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. raspberry-pi-k3s">
+          </div>
+          <div>
+            <label class="block text-[11px] text-slate-500 mb-1">Pasted Kubeconfig (YAML)</label>
+            <textarea x-model="clusterForm.externalKubeconfig" rows="5" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2 text-xs font-mono text-cyan-300 focus:border-cyan-500 focus:outline-none" placeholder="apiVersion: v1&#10;clusters:&#10;- cluster:&#10;    server: https://192.168.1.100:6443..." required></textarea>
+          </div>
+          <button type="submit" class="w-full bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold py-2 border border-slate-700 rounded-lg text-xs transition">⚡ Connect External Cluster</button>
+        </form>
       </div>
 
-      <div style="display: flex; justify-content: flex-end;">
-        <button type="button" class="btn btn-outline" onclick="closeModal('clusterModal')">Close</button>
+      <div class="flex justify-end pt-4 border-t border-slate-800 mt-6">
+        <button @click="closeModal('cluster')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg text-sm">Close</button>
       </div>
     </div>
   </div>
 
-  <!-- Create Custom Offer Modal -->
-  <div class="modal-backdrop" id="customOfferModal">
-    <div class="modal">
-      <div class="modal-header">
-        <h3>🧩 Create Custom Offer</h3>
-        <button class="close-btn" onclick="closeModal('customOfferModal')">&times;</button>
+  <!-- Modal: Create Custom Offer -->
+  <div class="modal-backdrop bg-slate-950/80 backdrop-blur-sm fixed inset-0 flex items-center justify-center z-50 p-4" x-show="modals.customOffer" @click.self="closeModal('customOffer')">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-lg w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <h3 class="text-lg font-bold text-white">Create Custom Offer</h3>
+        <button @click="closeModal('customOffer')" class="text-slate-400 hover:text-white text-xl">&times;</button>
       </div>
-      <form onsubmit="handleCreateCustomOffer(event)">
-        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
-          Add a custom infrastructure service (e.g. MongoDB, Elasticsearch, Cassandra) that NavisPaaS will automatically deploy and inject environment variables for.
-        </p>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <label>Offer ID <span style="color:#ef4444">*</span></label>
-            <input type="text" id="custOfferID" class="form-control" placeholder="e.g. mongodb" required>
+      <form @submit.prevent="handleCreateCustomOffer()">
+        <p class="text-xs text-slate-400 mb-4">Define a new infrastructure service dynamically that gets automatically deployed and has its variables auto-injected into linked microservices.</p>
+
+        <div class="space-y-4">
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Offer ID <span class="text-rose-500">*</span></label>
+              <input type="text" x-model="customOfferForm.id" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. mongodb" required>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Name <span class="text-rose-500">*</span></label>
+              <input type="text" x-model="customOfferForm.name" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. MongoDB Database" required>
+            </div>
           </div>
-          <div class="form-group">
-            <label>Offer Name <span style="color:#ef4444">*</span></label>
-            <input type="text" id="custOfferName" class="form-control" placeholder="e.g. MongoDB NoSQL" required>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Category</label>
+              <select x-model="customOfferForm.category" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none">
+                <option value="Database">Database</option>
+                <option value="Messaging">Messaging</option>
+                <option value="Networking">Networking</option>
+                <option value="Storage">Storage</option>
+                <option value="Observability">Observability</option>
+                <option value="Custom">Custom</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Env Variable Prefix <span class="text-rose-500">*</span></label>
+              <input type="text" x-model="customOfferForm.envPrefix" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. MONGODB" required>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-3 gap-4">
+            <div class="col-span-2">
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Docker Image <span class="text-rose-500">*</span></label>
+              <input type="text" x-model="customOfferForm.image" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. mongo:7.0" required>
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-400 mb-1">Container Port <span class="text-rose-500">*</span></label>
+              <input type="number" x-model.number="customOfferForm.port" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="27017" required>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Description</label>
+            <textarea x-model="customOfferForm.description" rows="2" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="A brief summary of what this offer does..."></textarea>
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <label>Category</label>
-            <select id="custOfferCategory" class="form-control">
-              <option value="Database">Database</option>
-              <option value="Messaging">Messaging</option>
-              <option value="Networking">Networking</option>
-              <option value="Observability">Observability</option>
-              <option value="Storage">Storage</option>
-              <option value="Custom">Custom</option>
+        <div class="flex justify-end gap-3 border-t border-slate-800 pt-4 mt-6">
+          <button type="button" @click="closeModal('customOffer')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg transition text-sm">Cancel</button>
+          <button type="submit" class="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg shadow-lg shadow-cyan-500/5 transition text-sm">Create & Register</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Link Offer parameters -->
+  <div class="modal-backdrop bg-slate-950/80 backdrop-blur-sm fixed inset-0 flex items-center justify-center z-50 p-4" x-show="modals.link" @click.self="closeModal('link')">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <h3 class="text-lg font-bold text-white" x-text="'Link Offer to \'' + linkForm.appName + '\''"></h3>
+        <button @click="closeModal('link')" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+
+      <form @submit.prevent="handleLinkOfferSubmit()">
+        <div class="space-y-4 mb-6">
+          <div>
+            <label class="block text-xs font-semibold text-slate-400 mb-1">Choose Offer</label>
+            <select x-model="linkForm.offerId" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none">
+              <template x-for="offer in offers" :key="offer.id">
+                <option :value="offer.id" x-text="offer.name + ' (' + offer.category + ')'"></option>
+              </template>
             </select>
           </div>
-          <div class="form-group">
-            <label>Env Variable Prefix <span style="color:#ef4444">*</span></label>
-            <input type="text" id="custOfferEnvPrefix" class="form-control" placeholder="e.g. MONGODB" required>
-            <small style="color:#64748b;font-size:0.7rem;">Injects MONGODB_HOST, MONGODB_PORT, MONGODB_URL</small>
+
+          <!-- Dynamic Offer Parameters -->
+          <div class="bg-slate-950 border border-slate-850 p-4 rounded-xl space-y-3">
+            <div class="text-xs font-semibold text-slate-400">Offer Parameters</div>
+            <template x-if="getSelectedOfferParameters().length === 0">
+              <span class="text-xs text-slate-500 italic block">No custom parameters required for this offer. Ready to link!</span>
+            </template>
+            <template x-for="param in getSelectedOfferParameters()" :key="param.key">
+              <div>
+                <label class="block text-[11px] text-slate-500 mb-1" x-text="param.label"></label>
+                <input :type="param.type === 'number' ? 'number' : 'text'" x-model="linkForm.params[param.key]" class="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 text-xs text-slate-200 focus:border-cyan-500 focus:outline-none">
+                <small class="text-[10px] text-slate-500" x-text="param.description"></small>
+              </div>
+            </template>
           </div>
         </div>
 
-        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1rem;">
-          <div class="form-group">
-            <label>Docker Image <span style="color:#ef4444">*</span></label>
-            <input type="text" id="custOfferImage" class="form-control" placeholder="e.g. mongo:7.0" required>
-          </div>
-          <div class="form-group">
-            <label>Port <span style="color:#ef4444">*</span></label>
-            <input type="number" id="custOfferPort" class="form-control" placeholder="27017" required>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>Description</label>
-          <textarea id="custOfferDesc" class="form-control" rows="2" placeholder="Brief explanation of this custom offer..."></textarea>
-        </div>
-
-        <div style="display: flex; justify-content: flex-end; gap: 0.75rem; margin-top: 1.5rem;">
-          <button type="button" class="btn btn-outline" onclick="closeModal('customOfferModal')">Cancel</button>
-          <button type="submit" class="btn btn-primary">Create & Register Offer</button>
+        <div class="flex justify-end gap-3 border-t border-slate-800 pt-4">
+          <button type="button" @click="closeModal('link')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg text-sm">Cancel</button>
+          <button type="submit" class="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm">Link Offer</button>
         </div>
       </form>
     </div>
   </div>
 
+  <!-- Modal: App Logs & Pods -->
+  <div class="modal-backdrop bg-slate-950/80 backdrop-blur-sm fixed inset-0 flex items-center justify-center z-50 p-4" x-show="modals.details" @click.self="closeModal('details')">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-4xl w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i class="fa-solid fa-terminal text-purple-400"></i>
+          <span x-text="'App Details: ' + appDetails.name"></span>
+        </h3>
+        <button @click="closeModal('details')" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+
+      <div class="flex-1 overflow-y-auto space-y-5 pr-1">
+        <!-- Active Pods -->
+        <div>
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Active Pods</div>
+          <div class="space-y-2">
+            <template x-if="!appDetails.pods || appDetails.pods.length === 0">
+              <div class="text-sm text-slate-500 italic">No pods found for this application.</div>
+            </template>
+            <template x-for="pod in appDetails.pods" :key="pod.name">
+              <div class="bg-slate-950 border border-slate-850 p-3 rounded-lg flex justify-between items-center text-sm">
+                <div>
+                  <span class="font-bold text-slate-200" x-text="pod.name"></span>
+                  <span class="text-xs text-slate-500 ml-2" x-text="'IP: ' + (pod.ip || 'Pending')"></span>
+                </div>
+                <div class="flex items-center space-x-4">
+                  <span class="text-xs px-2 py-0.5 rounded-full font-medium" :class="pod.status === 'Running' ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'" x-text="pod.status"></span>
+                  <span class="text-xs text-slate-500" x-text="'Restarts: ' + pod.restarts"></span>
+                </div>
+              </div>
+            </template>
+          </div>
+        </div>
+
+        <!-- Injected Env Variables -->
+        <div>
+          <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Injected Environments</div>
+          <pre class="bg-slate-950 border border-slate-850 p-4 rounded-lg text-xs font-mono text-cyan-300 overflow-x-auto max-h-40" x-text="JSON.stringify(appDetails.envVars, null, 2)"></pre>
+        </div>
+
+        <!-- Container Logs -->
+        <div class="flex flex-col flex-1">
+          <div class="flex justify-between items-center mb-2">
+            <div class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Container Logs</div>
+            <button @click="refreshLogs()" class="text-xs text-cyan-400 hover:text-cyan-300 flex items-center space-x-1 font-bold">
+              <i class="fa-solid fa-arrows-rotate"></i>
+              <span>Refresh</span>
+            </button>
+          </div>
+          <pre class="bg-slate-950 border border-slate-850 p-4 rounded-lg text-xs font-mono text-slate-300 overflow-x-auto overflow-y-auto max-h-72 min-h-36 flex-1" x-text="appDetails.logs"></pre>
+        </div>
+      </div>
+
+      <div class="flex justify-end pt-4 border-t border-slate-800 mt-4">
+        <button @click="closeModal('details')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg text-sm">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Application Logic JS -->
   <script src="/static/app.js"></script>
 </body>
 </html>
