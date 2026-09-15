@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/nicolas-limadev/navis-paas/pkg/k8s"
@@ -87,6 +88,17 @@ func (c *Catalog) ListOffers(ctx context.Context) []models.OfferDefinition {
 		}
 		result = append(result, def)
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Category != result[j].Category {
+			return result[i].Category < result[j].Category
+		}
+		if result[i].Name != result[j].Name {
+			return result[i].Name < result[j].Name
+		}
+		return result[i].ID < result[j].ID
+	})
+
 	return result
 }
 

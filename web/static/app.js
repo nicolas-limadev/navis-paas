@@ -119,7 +119,20 @@ function navisApp() {
         const res = await fetch('/api/v1/offers');
         if (res.ok) {
           const data = await res.json();
-          this.offers = Array.isArray(data) ? data : [];
+          let parsedOffers = Array.isArray(data) ? data : [];
+          
+          // Sort offers by Category then by Name then by ID to prevent UI shuffling
+          parsedOffers.sort((a, b) => {
+            if (a.category < b.category) return -1;
+            if (a.category > b.category) return 1;
+            if (a.name < b.name) return -1;
+            if (a.name > b.name) return 1;
+            if (a.id < b.id) return -1;
+            if (a.id > b.id) return 1;
+            return 0;
+          });
+
+          this.offers = parsedOffers;
 
           // Fetch monitoring status if available
           const hasMonitoring = this.offers.find(o => o.id === 'monitoring' && o.installed);

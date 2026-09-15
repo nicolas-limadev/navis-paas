@@ -108,7 +108,7 @@
     <template x-if="activeTab === 'apps'">
       <div>
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" x-show="apps.length > 0">
-          <template x-for="app in apps" :key="app.name">
+          <template x-for="app in apps" :key="app.namespace + '/' + app.name">
             <div class="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden hover:border-slate-700 transition duration-200 flex flex-col justify-between shadow-xl shadow-slate-950/50">
               
               <!-- Card Header -->
