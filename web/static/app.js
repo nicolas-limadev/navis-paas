@@ -211,7 +211,7 @@ function renderOffers() {
             `}
           `}
           ${offer.id === 'monitoring' && offer.installed ? `
-            <a href="http://192.168.49.2:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
+            <a href="http://${window.location.hostname}:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
               Open Grafana (30080) ↗
             </a>
             <span style="font-size:0.75rem;color:var(--text-secondary);" title="Grafana Credentials">
@@ -219,7 +219,7 @@ function renderOffers() {
             </span>
           ` : ''}
           ${offer.id === 'rabbitmq' && offer.installed ? `
-            <a href="http://192.168.49.2:30673" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
+            <a href="http://${window.location.hostname}:30673" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
               RabbitMQ UI (30673) ↗
             </a>
             <span style="font-size:0.75rem;color:var(--text-secondary);" title="RabbitMQ Credentials">
@@ -227,7 +227,7 @@ function renderOffers() {
             </span>
           ` : ''}
           ${offer.id === 'minio' && offer.installed ? `
-            <a href="http://192.168.49.2:30901" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
+            <a href="http://${window.location.hostname}:30901" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
               MinIO Console (30901) ↗
             </a>
             <span style="font-size:0.75rem;color:var(--text-secondary);" title="MinIO Credentials">
@@ -461,7 +461,11 @@ async function handleInstallOffer(offerId) {
       body: JSON.stringify({})
     });
     const data = await res.json();
-    alert(data.message || (data.detail ? 'Error: ' + data.detail : 'Installed successfully'));
+    if (!res.ok) {
+      alert('Installation failed: ' + (data.detail || data.error || res.statusText));
+      return;
+    }
+    alert(data.message || 'Installed successfully');
     fetchOffers();
   } catch (err) {
     alert('Installation failed: ' + err.message);
@@ -493,6 +497,10 @@ async function handleInstallMonitoring() {
       body: JSON.stringify({ prometheus, grafana, otel })
     });
     const data = await res.json();
+    if (!res.ok) {
+      alert('Installation failed: ' + (data.detail || data.error || res.statusText));
+      return;
+    }
     alert(data.message || 'Installed successfully');
     fetchOffers();
   } catch (err) {
