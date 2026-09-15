@@ -7,8 +7,8 @@
   
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Alpine.js CDN -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Alpine.js CDN (pinned version to avoid regressions) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
   <!-- FontAwesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
@@ -183,9 +183,7 @@
                   <div class="flex justify-between"><span class="text-slate-500">Image:</span> <span class="font-mono text-xs max-w-[200px] truncate" :title="app.image" x-text="app.image"></span></div>
                   <div class="flex justify-between"><span class="text-slate-500">Port:</span> <span class="font-semibold text-slate-300" x-text="app.port"></span></div>
                   <div class="flex justify-between"><span class="text-slate-500">Replicas:</span> <span class="font-semibold text-slate-300" x-text="app.readyCount + ' / ' + app.replicas"></span></div>
-                  <template x-if="app.accessURL">
-                    <div class="flex justify-between items-center"><span class="text-slate-500">Live URL:</span> <a :href="app.accessURL" target="_blank" class="text-cyan-400 hover:underline font-semibold flex items-center space-x-1"><span>Open</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a></div>
-                  </template>
+                  <div x-show="app.accessURL" class="flex justify-between items-center"><span class="text-slate-500">Live URL:</span> <a :href="app.accessURL" target="_blank" class="text-cyan-400 hover:underline font-semibold flex items-center space-x-1"><span>Open</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a></div>
                 </div>
               </div>
 
@@ -193,9 +191,7 @@
               <div class="px-6 py-4 bg-slate-900/20 border-b border-slate-800/30 flex-1">
                 <div class="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2.5">Linked Offers</div>
                 <div class="flex flex-wrap gap-2">
-                  <template x-if="!app.linkedOffers || app.linkedOffers.length === 0">
-                    <span class="text-xs text-slate-500 italic">No offers linked</span>
-                  </template>
+                  <span x-show="!app.linkedOffers || app.linkedOffers.length === 0" class="text-xs text-slate-500 italic">No offers linked</span>
                   <template x-for="offer in app.linkedOffers" :key="offer.offerId">
                     <span class="inline-flex items-center px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs font-semibold text-cyan-300">
                       <span x-text="offer.offerName"></span>
@@ -272,8 +268,7 @@
                 <p class="text-sm text-slate-400 leading-relaxed mb-6" x-text="offer.description"></p>
 
                 <!-- Dynamic Monitoring Details -->
-                <template x-if="offer.id === 'monitoring'">
-                  <div class="bg-slate-950 border border-slate-800 rounded-lg p-3.5 mb-6 space-y-2">
+                <div x-show="offer.id === 'monitoring'" class="bg-slate-950 border border-slate-800 rounded-lg p-3.5 mb-6 space-y-2">
                     <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Cluster Components</div>
                     <div class="flex flex-col gap-2">
                       <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
@@ -290,7 +285,6 @@
                       </label>
                     </div>
                   </div>
-                </template>
 
                 <div class="text-xs text-slate-500 space-y-1 mb-6">
                   <div>Version: <strong class="text-slate-300" x-text="offer.version"></strong></div>
@@ -300,62 +294,48 @@
 
               <!-- Actions -->
               <div class="flex flex-col gap-3">
-                <template x-if="offer.id === 'monitoring'">
-                  <button @click="handleInstallMonitoring()" class="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-cyan-500/5">
+                <button x-show="offer.id === 'monitoring'" @click="handleInstallMonitoring()" class="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-cyan-500/5">
                     <i class="fa-solid fa-bolt"></i>
                     <span x-text="offer.installed ? 'Update Components' : 'Install to Cluster'"></span>
                   </button>
-                </template>
-                <template x-if="offer.id !== 'monitoring' && !offer.installed">
-                  <button @click="handleInstallOffer(offer.id)" class="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-cyan-500/5">
+                <button x-show="offer.id !== 'monitoring' && !offer.installed" @click="handleInstallOffer(offer.id)" class="w-full bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold py-2 rounded-lg transition text-xs flex items-center justify-center space-x-1.5 shadow-lg shadow-cyan-500/5">
                     <i class="fa-solid fa-bolt"></i>
                     <span>Install to Cluster</span>
                   </button>
-                </template>
-                <template x-if="offer.id !== 'monitoring' && offer.installed">
-                  <button class="w-full bg-slate-800 text-slate-500 font-semibold py-2 rounded-lg border border-slate-700 text-xs cursor-default" disabled>
+                <button x-show="offer.id !== 'monitoring' && offer.installed" class="w-full bg-slate-800 text-slate-500 font-semibold py-2 rounded-lg border border-slate-700 text-xs cursor-default" disabled>
                     <i class="fa-solid fa-check text-emerald-500 mr-1.5"></i>
                     <span>Installed</span>
                   </button>
-                </template>
 
                 <!-- UI Management Links with Credentials -->
                 <div class="mt-2 space-y-2">
-                  <template x-if="offer.id === 'monitoring' && offer.installed">
-                    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                  <div x-show="offer.id === 'monitoring' && offer.installed" class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
                       <a :href="'http://' + window.location.hostname + ':30080'" target="_blank" class="text-xs text-cyan-400 hover:underline font-bold flex items-center space-x-1">
                         <span>Open Grafana (30080)</span>
                         <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                       </a>
                       <span class="text-[10px] text-slate-500 font-mono">admin / navispaas</span>
                     </div>
-                  </template>
-                  <template x-if="offer.id === 'rabbitmq' && offer.installed">
-                    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                  <div x-show="offer.id === 'rabbitmq' && offer.installed" class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
                       <a :href="'http://' + window.location.hostname + ':30673'" target="_blank" class="text-xs text-cyan-400 hover:underline font-bold flex items-center space-x-1">
                         <span>RabbitMQ UI (30673)</span>
                         <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                       </a>
                       <span class="text-[10px] text-slate-500 font-mono">guest / guest</span>
                     </div>
-                  </template>
-                  <template x-if="offer.id === 'minio' && offer.installed">
-                    <div class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
+                  <div x-show="offer.id === 'minio' && offer.installed" class="flex items-center justify-between bg-slate-950/60 p-2.5 rounded-lg border border-slate-800">
                       <a :href="'http://' + window.location.hostname + ':30901'" target="_blank" class="text-xs text-cyan-400 hover:underline font-bold flex items-center space-x-1">
                         <span>MinIO Console (30901)</span>
                         <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
                       </a>
                       <span class="text-[10px] text-slate-500 font-mono">minioadmin / minioadmin</span>
                     </div>
-                  </template>
                 </div>
 
                 <!-- Custom Offers Delete Button -->
-                <template x-if="['kafka','monitoring','redis','postgresql','mysql','mongodb','kong','nginx','rabbitmq','nats','minio'].indexOf(offer.id) === -1">
-                  <button @click="handleDeleteCustomOffer(offer.id)" class="w-full bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 border border-rose-900/30 font-semibold py-1.5 rounded-lg transition text-xs">
+                <button x-show="['kafka','monitoring','redis','postgresql','mysql','mongodb','kong','nginx','rabbitmq','nats','minio'].indexOf(offer.id) === -1" @click="handleDeleteCustomOffer(offer.id)" class="w-full bg-rose-950/40 hover:bg-rose-900/40 text-rose-400 border border-rose-900/30 font-semibold py-1.5 rounded-lg transition text-xs">
                     Delete Custom Offer
                   </button>
-                </template>
               </div>
 
             </div>
@@ -740,6 +720,6 @@
   </div>
 
   <!-- Application Logic JS -->
-  <script src="/static/app.js"></script>
+  <script src="/static/app.js?v=4"></script>
 </body>
 </html>

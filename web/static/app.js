@@ -82,15 +82,17 @@ function navisApp() {
      },
      _notificationTimeout: null,
 
-     showNotification(message, type = 'info') {
-       if (this._notificationTimeout) {
-         clearTimeout(this._notificationTimeout);
-       }
-       this.notification = { show: true, message: String(message), type: type };
-       this._notificationTimeout = setTimeout(() => {
-         this.notification.show = false;
-       }, 4000);
-     },
+      showNotification(message, type = 'info') {
+        if (this._notificationTimeout) {
+          clearTimeout(this._notificationTimeout);
+        }
+        this.notification.show = true;
+        this.notification.message = String(message);
+        this.notification.type = type;
+        this._notificationTimeout = setTimeout(() => {
+          this.notification.show = false;
+        }, 4000);
+      },
 
      hideNotification() {
        if (this._notificationTimeout) {
