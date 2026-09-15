@@ -99,6 +99,7 @@ function navisApp() {
         }
       } catch (err) {
         console.error('Failed to fetch cluster health:', err);
+        this.cluster = { connected: false };
       }
     },
 

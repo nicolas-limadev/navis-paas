@@ -40,16 +40,13 @@ func (m *ClientManager) Connect() error {
 	return m.ConnectWithContext("")
 }
 
-// ConnectWithContext connects using a specific context name or default
-func (m *ClientManager) ConnectWithContext(targetContext string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-
+// connectLocked performs connection without acquiring mutex locks (caller must hold lock)
+func (m *ClientManager) connectLocked(targetContext string) error {
 	var config *rest.Config
 	var err error
 	var contextName string
 
-	// 1. Try In-Cluster Config if targetContext is "in-cluster" or empty and in-cluster succeeds
+	// 1. Try In-Cluster Config if targetContext is "in-cluster" or empty
 	if targetContext == "in-cluster" || targetContext == "" {
 		inClusterCfg, inClusterErr := rest.InClusterConfig()
 		if inClusterErr == nil {
@@ -64,22 +61,31 @@ func (m *ClientManager) ConnectWithContext(targetContext string) error {
 		if kubeconfig == "" {
 			homeDir, err := os.UserHomeDir()
 			if err == nil {
-				kubeconfig = filepath.Join(homeDir, ".kube", "config")
+				standardKube := filepath.Join(homeDir, ".kube", "config")
+				if _, err := os.Stat(standardKube); err == nil {
+					kubeconfig = standardKube
+				} else {
+					extKube := filepath.Join(homeDir, ".kube", "navis-external.yaml")
+					if _, err := os.Stat(extKube); err == nil {
+						kubeconfig = extKube
+					} else {
+						kubeconfig = standardKube
+					}
+				}
 			}
 		}
 
 		if kubeconfig != "" {
 			loadingRules := &clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig}
 			configOverrides := &clientcmd.ConfigOverrides{}
-			if targetContext != "" {
+			if targetContext != "" && targetContext != "in-cluster" {
 				configOverrides.CurrentContext = targetContext
 			}
 
 			clientConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
-
 			rawConfig, rawErr := clientConfig.RawConfig()
 			if rawErr == nil {
-				if targetContext != "" {
+				if targetContext != "" && targetContext != "in-cluster" {
 					contextName = targetContext
 				} else {
 					contextName = rawConfig.CurrentContext
@@ -129,6 +135,26 @@ func (m *ClientManager) ConnectWithContext(targetContext string) error {
 	m.LastError = nil
 
 	return nil
+}
+
+// ConnectWithContext connects using a specific context name or default
+func (m *ClientManager) ConnectWithContext(targetContext string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	return m.connectLocked(targetContext)
+}
+
+// EnsureConnected checks if the client is connected, and attempts auto-reconnect if not
+func (m *ClientManager) EnsureConnected(ctx context.Context) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.Connected && m.Clientset != nil {
+		return nil
+	}
+
+	return m.connectLocked(m.ContextName)
 }
 
 // SetKubeconfigContent connects to a cluster using a raw Kubeconfig string (e.g. Raspberry Pi or external K8s)
@@ -234,15 +260,20 @@ func (m *ClientManager) CheckConnectivity(ctx context.Context) (bool, string, er
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if m.Clientset == nil {
-		// Attempt reconnect
-		m.mu.Unlock()
-		_ = m.Connect()
-		m.mu.Lock()
+	// 1. If currently marked connected and clientset exists, test connection health
+	if m.Connected && m.Clientset != nil {
+		version, err := m.Clientset.Discovery().ServerVersion()
+		if err == nil {
+			return true, version.GitVersion, nil
+		}
+		// Connection lost, reset and fall through to reconnect
+		m.Connected = false
+		m.LastError = err
 	}
 
-	if !m.Connected || m.Clientset == nil {
-		return false, "", m.LastError
+	// 2. Attempt reconnect
+	if err := m.connectLocked(m.ContextName); err != nil {
+		return false, "", err
 	}
 
 	version, err := m.Clientset.Discovery().ServerVersion()

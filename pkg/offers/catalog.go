@@ -76,13 +76,17 @@ func (c *Catalog) Register(handler OfferHandler) {
 }
 
 func (c *Catalog) ListOffers(ctx context.Context) []models.OfferDefinition {
+	if c.cm != nil {
+		_ = c.cm.EnsureConnected(ctx)
+	}
+
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
 	var result []models.OfferDefinition
 	for _, handler := range c.handlers {
 		def := handler.GetDefinition()
-		if c.cm.Connected {
+		if c.cm != nil && c.cm.Connected {
 			installed, _ := handler.IsInstalled(ctx, c.cm)
 			def.Installed = installed
 		}

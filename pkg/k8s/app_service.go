@@ -61,6 +61,7 @@ func (s *AppService) EnsureNamespace(ctx context.Context, namespace string) erro
 
 // CreateOrUpdateApp deploys an application (Deployment + Service) to Kubernetes
 func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateAppRequest) (*models.Application, error) {
+	_ = s.clientManager.EnsureConnected(ctx)
 	if !s.clientManager.Connected {
 		return nil, fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
@@ -211,6 +212,7 @@ func (s *AppService) CreateOrUpdateApp(ctx context.Context, req models.CreateApp
 
 // ListApps returns all applications managed by NavisPaaS across namespaces
 func (s *AppService) ListApps(ctx context.Context, namespace string) ([]models.Application, error) {
+	_ = s.clientManager.EnsureConnected(ctx)
 	if !s.clientManager.Connected {
 		return nil, fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
@@ -301,6 +303,7 @@ func (s *AppService) findAppDeployment(ctx context.Context, namespace, name stri
 
 // GetApp returns the detailed application information
 func (s *AppService) GetApp(ctx context.Context, namespace, name string) (*models.Application, error) {
+	_ = s.clientManager.EnsureConnected(ctx)
 	if !s.clientManager.Connected {
 		return nil, fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
@@ -382,15 +385,19 @@ func (s *AppService) GetAppDetails(ctx context.Context, namespace, name string) 
 
 // DeleteApp deletes the deployment, service, and any linked resources
 func (s *AppService) DeleteApp(ctx context.Context, namespace, name string) error {
+	_ = s.clientManager.EnsureConnected(ctx)
 	if !s.clientManager.Connected {
 		return fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}
 
 	dep, err := s.findAppDeployment(ctx, namespace, name)
-	if err != nil {
-		return err
+	actualNamespace := namespace
+	if actualNamespace == "" {
+		actualNamespace = name
 	}
-	actualNamespace := dep.Namespace
+	if err == nil && dep != nil {
+		actualNamespace = dep.Namespace
+	}
 
 	// Delete Deployment
 	_ = s.clientManager.Clientset.AppsV1().Deployments(actualNamespace).Delete(ctx, name, metav1.DeleteOptions{})
@@ -399,7 +406,7 @@ func (s *AppService) DeleteApp(ctx context.Context, namespace, name string) erro
 	_ = s.clientManager.Clientset.CoreV1().Services(actualNamespace).Delete(ctx, name, metav1.DeleteOptions{})
 
 	// If the application was in its own dedicated namespace, remove the namespace cleanly
-	if actualNamespace == name {
+	if actualNamespace == name && actualNamespace != DefaultNamespace && actualNamespace != "default" && actualNamespace != "kube-system" {
 		_ = s.clientManager.Clientset.CoreV1().Namespaces().Delete(ctx, actualNamespace, metav1.DeleteOptions{})
 	}
 
@@ -408,6 +415,7 @@ func (s *AppService) DeleteApp(ctx context.Context, namespace, name string) erro
 
 // GetAppLogs retrieves recent logs from the first available pod of the app
 func (s *AppService) GetAppLogs(ctx context.Context, namespace, name string, tailLines int64) (string, error) {
+	_ = s.clientManager.EnsureConnected(ctx)
 	if !s.clientManager.Connected {
 		return "", fmt.Errorf("cluster disconnected: %w", s.clientManager.LastError)
 	}

@@ -53,6 +53,10 @@ func (o *OfferAdapter) ListOffers(ctx context.Context) []OfferDefinition {
 }
 
 func (o *OfferAdapter) InstallOffer(ctx context.Context, offerID string, prometheus, grafana, otel bool) error {
+	if o.cm != nil {
+		_ = o.cm.EnsureConnected(ctx)
+	}
+
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return err
@@ -69,6 +73,10 @@ func (o *OfferAdapter) InstallOffer(ctx context.Context, offerID string, prometh
 }
 
 func (o *OfferAdapter) GetOfferStatus(ctx context.Context, offerID string) (map[string]bool, error) {
+	if o.cm != nil {
+		_ = o.cm.EnsureConnected(ctx)
+	}
+
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return nil, err
@@ -90,6 +98,10 @@ func (o *OfferAdapter) GetOfferStatus(ctx context.Context, offerID string) (map[
 }
 
 func (o *OfferAdapter) BindOffer(ctx context.Context, app *Application, offerID string, params map[string]string) (map[string]string, error) {
+	if o.cm != nil {
+		_ = o.cm.EnsureConnected(ctx)
+	}
+
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return nil, err
@@ -98,6 +110,10 @@ func (o *OfferAdapter) BindOffer(ctx context.Context, app *Application, offerID 
 }
 
 func (o *OfferAdapter) UnbindOffer(ctx context.Context, app *Application, offerID string) error {
+	if o.cm != nil {
+		_ = o.cm.EnsureConnected(ctx)
+	}
+
 	handler, err := o.catalog.GetOffer(offerID)
 	if err != nil {
 		return err
