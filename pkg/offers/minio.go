@@ -126,12 +126,11 @@ func (m *MinIOOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/minio/health/ready",
+									TCPSocket: &corev1.TCPSocketAction{
 										Port: intstr.FromInt(9000),
 									},
 								},
-								InitialDelaySeconds: 10,
+								InitialDelaySeconds: 5,
 								PeriodSeconds:       5,
 							},
 						},

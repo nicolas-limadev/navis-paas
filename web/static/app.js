@@ -212,8 +212,27 @@ function renderOffers() {
           `}
           ${offer.id === 'monitoring' && offer.installed ? `
             <a href="http://192.168.49.2:30080" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
-              Open Grafana (192.168.49.2:30080) ↗
+              Open Grafana (30080) ↗
             </a>
+            <span style="font-size:0.75rem;color:var(--text-secondary);" title="Grafana Credentials">
+              🔐 <code>admin</code> / <code>navispaas</code>
+            </span>
+          ` : ''}
+          ${offer.id === 'rabbitmq' && offer.installed ? `
+            <a href="http://192.168.49.2:30673" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
+              RabbitMQ UI (30673) ↗
+            </a>
+            <span style="font-size:0.75rem;color:var(--text-secondary);" title="RabbitMQ Credentials">
+              🔐 <code>guest</code> / <code>guest</code>
+            </span>
+          ` : ''}
+          ${offer.id === 'minio' && offer.installed ? `
+            <a href="http://192.168.49.2:30901" target="_blank" class="btn btn-outline btn-sm" style="text-decoration:none;color:#38bdf8;">
+              MinIO Console (30901) ↗
+            </a>
+            <span style="font-size:0.75rem;color:var(--text-secondary);" title="MinIO Credentials">
+              🔐 <code>minioadmin</code> / <code>minioadmin</code>
+            </span>
           ` : ''}
           ${['kafka','monitoring','redis','postgresql','mysql','mongodb','kong','nginx','rabbitmq','nats','minio'].indexOf(offer.id) === -1 ? `
             <button class="btn btn-danger btn-sm" onclick="handleDeleteCustomOffer('${offer.id}')" title="Delete custom offer definition">

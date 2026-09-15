@@ -107,16 +107,15 @@ func (n *NATSOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 						{
 							Name:  "nats",
 							Image: "nats:2.10-alpine",
-							Args:  []string{"-js"}, // -js enables JetStream
+							Args:  []string{"-js", "-m", "8222"}, // -js enables JetStream, -m 8222 enables HTTP monitoring
 							Ports: []corev1.ContainerPort{
 								{Name: "client", ContainerPort: 4222},
 								{Name: "monitor", ContainerPort: 8222},
 							},
 							ReadinessProbe: &corev1.Probe{
 								ProbeHandler: corev1.ProbeHandler{
-									HTTPGet: &corev1.HTTPGetAction{
-										Path: "/healthz",
-										Port: intstr.FromInt(8222),
+									TCPSocket: &corev1.TCPSocketAction{
+										Port: intstr.FromInt(4222),
 									},
 								},
 								InitialDelaySeconds: 5,

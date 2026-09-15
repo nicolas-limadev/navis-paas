@@ -62,6 +62,11 @@ Em vez de escrever dezenas de arquivos de configuração (`Deployment`, `Service
 | 📦 **Storage** | `minio` | MinIO Storage | Object storage S3 com `S3_ENDPOINT`, `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`. |
 | 📊 **Observability**| `monitoring` | Observability Stack | Prometheus + Grafana (`:30080`) + OpenTelemetry Collector (`OTEL_EXPORTER_*`). |
 | ⚙️ **Custom** | *custom* | Oferta Dinâmica | Crie ofertas personalizadas via UI/API ou arquivos `.yaml` em `custom-offers/`. |
+
+#### 🔐 Credenciais Padrão dos Painéis de Gestão (UIs):
+* **Grafana Dashboard** (`:30080`): Usuário: `admin` \| Senha: `navispaas`
+* **RabbitMQ Management UI** (`:30673`): Usuário: `guest` \| Senha: `guest`
+* **MinIO Console S3 UI** (`:30901`): Usuário: `minioadmin` \| Senha: `minioadmin`
 * 🐳 **Suporte a Docker Registry (Público, Privado e Minikube Local)**:
   * **Docker Hub**: Padrão nativo (`docker.io`) para imagens públicas.
   * **Registries Privados (GHCR, Harbor, ECR, GitLab)**: Gerenciamento de credenciais via UI/API com criação automática de Secret `kubernetes.io/dockerconfigjson` e injeção de `imagePullSecrets`.
