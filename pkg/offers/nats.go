@@ -61,9 +61,9 @@ func (n *NATSOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 
 	ns := NATSNamespace
 	// 1. Create namespace
-	_, err := cm.Clientset.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
+	nsObj, err := cm.Clientset.CoreV1().Namespaces().Get(ctx, ns, metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		nsObj := &corev1.Namespace{
+		newNS := &corev1.Namespace{
 			ObjectMeta: metav1.ObjectMeta{
 				Name: ns,
 				Labels: map[string]string{
@@ -78,10 +78,12 @@ func (n *NATSOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 				},
 			},
 		}
-		_, err = cm.Clientset.CoreV1().Namespaces().Create(ctx, nsObj, metav1.CreateOptions{})
-		if err != nil {
-			return fmt.Errorf("failed to create nats namespace: %w", err)
+		_, createErr := cm.Clientset.CoreV1().Namespaces().Create(ctx, newNS, metav1.CreateOptions{})
+		if createErr != nil && !errors.IsAlreadyExists(createErr) {
+			return fmt.Errorf("failed to create nats namespace: %w", createErr)
 		}
+	} else if err == nil && nsObj.DeletionTimestamp != nil {
+		return fmt.Errorf("namespace '%s' is currently terminating. Please wait a few seconds and try again", ns)
 	}
 
 	// 2. NATS Deployment
@@ -129,7 +131,10 @@ func (n *NATSOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 	}
 	_, err = cm.Clientset.AppsV1().Deployments(ns).Get(ctx, "nats", metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, _ = cm.Clientset.AppsV1().Deployments(ns).Create(ctx, natsDep, metav1.CreateOptions{})
+		_, createErr := cm.Clientset.AppsV1().Deployments(ns).Create(ctx, natsDep, metav1.CreateOptions{})
+		if createErr != nil && !errors.IsAlreadyExists(createErr) {
+			return fmt.Errorf("failed to create nats deployment: %w", createErr)
+		}
 	}
 
 	// 3. NATS Service (NodePort)
@@ -150,7 +155,10 @@ func (n *NATSOffer) Install(ctx context.Context, cm *k8s.ClientManager) error {
 	}
 	_, err = cm.Clientset.CoreV1().Services(ns).Get(ctx, "nats-service", metav1.GetOptions{})
 	if errors.IsNotFound(err) {
-		_, _ = cm.Clientset.CoreV1().Services(ns).Create(ctx, natsSvc, metav1.CreateOptions{})
+		_, createErr := cm.Clientset.CoreV1().Services(ns).Create(ctx, natsSvc, metav1.CreateOptions{})
+		if createErr != nil && !errors.IsAlreadyExists(createErr) {
+			return fmt.Errorf("failed to create nats service: %w", createErr)
+		}
 	}
 
 	return nil
