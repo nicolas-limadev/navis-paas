@@ -72,7 +72,33 @@ function navisApp() {
       logs: 'Loading logs...',
     },
 
-    backstageTemplate: '',
+     backstageTemplate: '',
+
+     // Notification system (non-blocking replacement for alert())
+     notification: {
+       show: false,
+       message: '',
+       type: 'info', // 'success', 'error', 'warning', 'info'
+     },
+     _notificationTimeout: null,
+
+     showNotification(message, type = 'info') {
+       if (this._notificationTimeout) {
+         clearTimeout(this._notificationTimeout);
+       }
+       this.notification = { show: true, message: String(message), type: type };
+       this._notificationTimeout = setTimeout(() => {
+         this.notification.show = false;
+       }, 4000);
+     },
+
+     hideNotification() {
+       if (this._notificationTimeout) {
+         clearTimeout(this._notificationTimeout);
+         this._notificationTimeout = null;
+       }
+       this.notification.show = false;
+     },
 
     init() {
       this.fetchClusterHealth();
@@ -261,14 +287,15 @@ function navisApp() {
 
         const data = await res.json();
         if (!res.ok) {
-          alert('Deployment failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Deployment failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
+        this.showNotification('Application deployed successfully!', 'success');
         this.closeModal('deploy');
         this.fetchApps();
       } catch (err) {
-        alert('Error deploying application: ' + err.message);
+        this.showNotification('Error deploying application: ' + err.message, 'error');
       }
     },
 
@@ -309,14 +336,15 @@ function navisApp() {
 
         const data = await res.json();
         if (!res.ok) {
-          alert('Linking failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Linking failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
+        this.showNotification('Offer linked successfully!', 'success');
         this.closeModal('link');
         this.fetchApps();
       } catch (err) {
-        alert('Error linking offer: ' + err.message);
+        this.showNotification('Error linking offer: ' + err.message, 'error');
       }
     },
 
@@ -331,13 +359,14 @@ function navisApp() {
         const res = await fetch(url, { method: 'DELETE' });
         const data = await res.json();
         if (!res.ok) {
-          alert('Unlinking failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Unlinking failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
+        this.showNotification('Offer unlinked successfully!', 'success');
         this.fetchApps();
       } catch (err) {
-        alert('Error unlinking offer: ' + err.message);
+        this.showNotification('Error unlinking offer: ' + err.message, 'error');
       }
     },
 
@@ -354,13 +383,13 @@ function navisApp() {
         });
         const data = await res.json();
         if (!res.ok) {
-          alert('Installation failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Installation failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
-        alert(data.message || 'Installed successfully');
+        this.showNotification(data.message || 'Installed successfully', 'success');
         this.fetchOffers();
       } catch (err) {
-        alert('Error initiating install: ' + err.message);
+        this.showNotification('Error initiating install: ' + err.message, 'error');
       }
     },
 
@@ -385,13 +414,13 @@ function navisApp() {
         });
         const data = await res.json();
         if (!res.ok) {
-          alert('Installation failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Installation failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
-        alert(data.message || 'Installed successfully');
+        this.showNotification(data.message || 'Installed successfully', 'success');
         this.fetchOffers();
       } catch (err) {
-        alert('Error starting monitoring install: ' + err.message);
+        this.showNotification('Error starting monitoring install: ' + err.message, 'error');
       }
     },
 
@@ -409,17 +438,17 @@ function navisApp() {
 
         const data = await res.json();
         if (!res.ok) {
-          alert('Failed to switch context: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Failed to switch context: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
-        alert(`Switched active context to '${contextName}'!`);
+        this.showNotification(`Switched active context to '${contextName}'!`, 'success');
         this.closeModal('cluster');
         this.fetchClusterHealth();
         this.fetchApps();
         this.fetchOffers();
       } catch (err) {
-        alert('Error switching context: ' + err.message);
+        this.showNotification('Error switching context: ' + err.message, 'error');
       }
     },
 
@@ -436,17 +465,17 @@ function navisApp() {
 
         const data = await res.json();
         if (!res.ok) {
-          alert('Failed to connect to cluster: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Failed to connect to cluster: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
-        alert('Successfully connected to external cluster!');
+        this.showNotification('Successfully connected to external cluster!', 'success');
         this.closeModal('cluster');
         this.fetchClusterHealth();
         this.fetchApps();
         this.fetchOffers();
       } catch (err) {
-        alert('Error connecting: ' + err.message);
+        this.showNotification('Error connecting: ' + err.message, 'error');
       }
     },
 
@@ -471,15 +500,15 @@ function navisApp() {
 
         const data = await res.json();
         if (!res.ok) {
-          alert('Failed to create offer: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Failed to create offer: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
-        alert(`Custom offer '${name}' created and registered!`);
+        this.showNotification(`Custom offer '${name}' created and registered!`, 'success');
         this.closeModal('customOffer');
         this.fetchOffers();
       } catch (err) {
-        alert('Error creating offer: ' + err.message);
+        this.showNotification('Error creating offer: ' + err.message, 'error');
       }
     },
 
@@ -490,12 +519,13 @@ function navisApp() {
         const res = await fetch(`/api/v1/offers/custom/${offerId}`, { method: 'DELETE' });
         const data = await res.json();
         if (!res.ok) {
-          alert('Delete failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Delete failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
+        this.showNotification(`Custom offer '${offerId}' deleted successfully!`, 'success');
         this.fetchOffers();
       } catch (err) {
-        alert('Error deleting custom offer: ' + err.message);
+        this.showNotification('Error deleting custom offer: ' + err.message, 'error');
       }
     },
 
@@ -556,13 +586,14 @@ function navisApp() {
         const res = await fetch(url, { method: 'DELETE' });
         const data = await res.json();
         if (!res.ok) {
-          alert('Delete failed: ' + (data.detail || data.error || res.statusText));
+          this.showNotification('Delete failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
+        this.showNotification(`Application '${appName}' deleted successfully!`, 'success');
         this.fetchApps();
       } catch (err) {
-        alert('Error deleting application: ' + err.message);
+        this.showNotification('Error deleting application: ' + err.message, 'error');
       }
     },
 

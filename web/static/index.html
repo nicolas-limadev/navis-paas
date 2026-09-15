@@ -29,19 +29,71 @@
       }
     }
   </script>
-  <style>
-    [x-cloak] { display: none !important; }
-    /* Custom scrollbar for terminal feel */
-    ::-webkit-scrollbar { width: 6px; height: 6px; }
-    ::-webkit-scrollbar-track { background: #020617; }
-    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #334155; }
-  </style>
+   <style>
+     [x-cloak] { display: none !important; }
+     /* Custom scrollbar for terminal feel */
+     ::-webkit-scrollbar { width: 6px; height: 6px; }
+     ::-webkit-scrollbar-track { background: #020617; }
+     ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+     ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+     /* Notification toast styles */
+     .toast-container {
+       position: fixed;
+       top: 80px;
+       right: 20px;
+       z-index: 9999;
+       display: flex;
+       flex-direction: column;
+       gap: 10px;
+       pointer-events: none;
+     }
+     .toast {
+       pointer-events: auto;
+       min-width: 300px;
+       max-width: 450px;
+       padding: 14px 20px;
+       border-radius: 10px;
+       font-size: 14px;
+       font-weight: 500;
+       box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+       backdrop-filter: blur(12px);
+       border: 1px solid rgba(255,255,255,0.1);
+     }
+     .toast-success {
+       background: rgba(16, 185, 129, 0.15);
+       color: #34d399;
+       border-color: rgba(16, 185, 129, 0.3);
+     }
+     .toast-error {
+       background: rgba(239, 68, 68, 0.15);
+       color: #f87171;
+       border-color: rgba(239, 68, 68, 0.3);
+     }
+     .toast-warning {
+       background: rgba(245, 158, 11, 0.15);
+       color: #fbbf24;
+       border-color: rgba(245, 158, 11, 0.3);
+     }
+     .toast-info {
+       background: rgba(6, 182, 212, 0.15);
+       color: #38bdf8;
+       border-color: rgba(6, 182, 212, 0.3);
+     }
+   </style>
 </head>
 <body class="h-full flex flex-col font-sans selection:bg-cyan-500 selection:text-slate-900" x-data="navisApp()" x-init="init()" x-cloak>
 
-  <!-- Top Navigation Header -->
-  <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
+   <!-- Toast Notifications Container -->
+   <div class="toast-container" x-show="notification.show">
+     <div class="toast"
+          :class="'toast-' + notification.type"
+          x-text="notification.message">
+     </div>
+   </div>
+
+   <!-- Top Navigation Header -->
+   <header class="border-b border-slate-800 bg-slate-900/50 backdrop-blur-md sticky top-0 z-40">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="flex justify-between h-16 items-center">
         
