@@ -16,9 +16,19 @@ function navisApp() {
       customOffer: false,
       link: false,
       details: false,
+      registry: false,
     },
 
     // Forms states
+    registryForm: {
+      enabled: false,
+      server: 'ghcr.io',
+      username: '',
+      password: '',
+      email: '',
+      defaultPrefix: '',
+    },
+
     deployForm: {
       name: '',
       namespace: '',
@@ -341,13 +351,9 @@ function navisApp() {
     },
 
     async handleInstallMonitoring() {
-      const promEl = document.getElementById('monitor-prometheus');
-      const grafEl = document.getElementById('monitor-grafana');
-      const otelEl = document.getElementById('monitor-otel');
-
-      const prometheus = promEl ? promEl.checked : false;
-      const grafana = grafEl ? grafEl.checked : false;
-      const otel = otelEl ? otelEl.checked : false;
+      const prometheus = !!this.monitoringStatus.prometheus;
+      const grafana = !!this.monitoringStatus.grafana;
+      const otel = !!this.monitoringStatus.otel;
 
       if (!prometheus && !grafana && !otel) {
         alert('Please select at least one component to install.');
@@ -548,18 +554,11 @@ function navisApp() {
 
     // Save Registry config
     async handleSaveRegistry() {
-      const enabled = document.getElementById('regEnabled').checked;
-      const server = document.getElementById('regServer').value.trim();
-      const username = document.getElementById('regUsername').value.trim();
-      const password = document.getElementById('regPassword').value.trim();
-      const email = document.getElementById('regEmail').value.trim();
-      const defaultPrefix = document.getElementById('regDefaultPrefix').value.trim();
-
       try {
         const res = await fetch('/api/v1/registry', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ enabled, server, username, password, email, defaultPrefix })
+          body: JSON.stringify(this.registryForm)
         });
 
         const data = await res.json();
@@ -578,11 +577,14 @@ function navisApp() {
 
     openRegistryModal() {
       const reg = this.registry || {};
-      document.getElementById('regEnabled').checked = !!reg.enabled;
-      document.getElementById('regServer').value = reg.server || 'ghcr.io';
-      document.getElementById('regUsername').value = reg.username || '';
-      document.getElementById('regPassword').value = '';
-      document.getElementById('regDefaultPrefix').value = reg.defaultPrefix || '';
+      this.registryForm = {
+        enabled: !!reg.enabled,
+        server: reg.server || 'ghcr.io',
+        username: reg.username || '',
+        password: '',
+        email: reg.email || '',
+        defaultPrefix: reg.defaultPrefix || '',
+      };
       this.modals.registry = true;
     },
 

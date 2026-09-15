@@ -225,15 +225,15 @@
                     <div class="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">Cluster Components</div>
                     <div class="flex flex-col gap-2">
                       <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
-                        <input type="checkbox" id="monitor-prometheus" :checked="monitoringStatus.prometheus" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                        <input type="checkbox" x-model="monitoringStatus.prometheus" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
                         <span><strong>Prometheus</strong> - Metrics Poller <span class="text-emerald-400 ml-1" x-show="monitoringStatus.prometheus">(installed)</span></span>
                       </label>
                       <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
-                        <input type="checkbox" id="monitor-grafana" :checked="monitoringStatus.grafana" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                        <input type="checkbox" x-model="monitoringStatus.grafana" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
                         <span><strong>Grafana</strong> - Dashboards <span class="text-emerald-400 ml-1" x-show="monitoringStatus.grafana">(installed)</span></span>
                       </label>
                       <label class="flex items-center space-x-2.5 text-xs text-slate-400 cursor-pointer">
-                        <input type="checkbox" id="monitor-otel" :checked="monitoringStatus.otel" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+                        <input type="checkbox" x-model="monitoringStatus.otel" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
                         <span><strong>OpenTelemetry</strong> - Tracing <span class="text-emerald-400 ml-1" x-show="monitoringStatus.otel">(installed)</span></span>
                       </label>
                     </div>
@@ -627,6 +627,63 @@
       <div class="flex justify-end pt-4 border-t border-slate-800 mt-4">
         <button @click="closeModal('details')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg text-sm">Close</button>
       </div>
+    </div>
+  </div>
+
+  <!-- Modal: Registry Configuration -->
+  <div class="modal-backdrop bg-slate-950/80 backdrop-blur-sm fixed inset-0 flex items-center justify-center z-50 p-4" x-show="modals.registry" @click.self="closeModal('registry')">
+    <div class="bg-slate-900 border border-slate-800 rounded-xl max-w-md w-full p-6 shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-4 mb-4">
+        <h3 class="text-lg font-bold text-white flex items-center space-x-2">
+          <i class="fa-solid fa-key text-cyan-400"></i>
+          <span>Docker Registry Settings</span>
+        </h3>
+        <button @click="closeModal('registry')" class="text-slate-400 hover:text-white text-xl">&times;</button>
+      </div>
+
+      <form @submit.prevent="handleSaveRegistry()">
+        <div class="space-y-4">
+          <label class="flex items-center space-x-2.5 text-sm text-slate-300 cursor-pointer bg-slate-950 p-3 rounded-lg border border-slate-800">
+            <input type="checkbox" x-model="registryForm.enabled" class="rounded text-cyan-500 bg-slate-900 border-slate-700 focus:ring-0">
+            <span>Enable Private Docker Registry Secrets</span>
+          </label>
+
+          <template x-if="registryForm.enabled">
+            <div class="space-y-4 animate-in fade-in slide-in-from-top-2 duration-150">
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Registry Server</label>
+                <input type="text" x-model="registryForm.server" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. ghcr.io, docker.io">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Username / Robot Account</label>
+                <input type="text" x-model="registryForm.username" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. github-username">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Password / Access Token (PAT)</label>
+                <input type="password" x-model="registryForm.password" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="Leave empty to keep existing password">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Email (Optional)</label>
+                <input type="email" x-model="registryForm.email" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="dev@company.com">
+              </div>
+
+              <div>
+                <label class="block text-xs font-semibold text-slate-400 mb-1">Default Registry Prefix (Optional)</label>
+                <input type="text" x-model="registryForm.defaultPrefix" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-200 focus:border-cyan-500 focus:outline-none" placeholder="e.g. ghcr.io/my-org">
+                <small class="text-[10px] text-slate-500">Entering 'api:v1' automatically becomes 'ghcr.io/my-org/api:v1' on deployments.</small>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <div class="flex justify-end gap-3 border-t border-slate-800 pt-4 mt-6">
+          <button type="button" @click="closeModal('registry')" class="bg-slate-800 hover:bg-slate-700 text-slate-300 px-4 py-2 border border-slate-700 rounded-lg text-sm">Cancel</button>
+          <button type="submit" class="bg-cyan-500 hover:bg-cyan-600 text-slate-950 font-bold px-4 py-2 rounded-lg text-sm">Save & Sync Secret</button>
+        </div>
+      </form>
     </div>
   </div>
 
