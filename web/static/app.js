@@ -375,7 +375,11 @@ function navisApp() {
     // Offer Cluster Installation
     async handleInstallOffer(offerId) {
       const provider = this.cluster.provider || 'kubernetes';
-      if (!confirm(`Install '${offerId}' cluster components onto ${provider}?`)) return;
+      
+      // Se confirm estiver bloqueado pelo browser, window.confirm pode retornar false silencioso
+      if (!window.confirm(`Install '${offerId}' cluster components onto ${provider}?`)) {
+        return;
+      }
 
       try {
         const res = await fetch(`/api/v1/offers/${offerId}/install`, {
@@ -383,14 +387,23 @@ function navisApp() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({})
         });
-        const data = await res.json();
+
+        // Parse seguro para suportar 204 No Content ou texto puro
+        let data = {};
+        const text = await res.text();
+        if (text) {
+          try { data = JSON.parse(text); } catch (_) { data = { message: text }; }
+        }
+
         if (!res.ok) {
           this.showNotification('Installation failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
+
         this.showNotification(data.message || 'Installed successfully', 'success');
-        this.fetchOffers();
+        await this.fetchOffers();
       } catch (err) {
+        console.error('Error initiating install:', err);
         this.showNotification('Error initiating install: ' + err.message, 'error');
       }
     },
@@ -578,7 +591,9 @@ function navisApp() {
     },
 
     async handleDeleteApp(appName, appNamespace) {
-      if (!confirm(`Are you sure you want to delete application '${appName}'?`)) return;
+      if (!window.confirm(`Are you sure you want to delete application '${appName}'?`)) {
+        return;
+      }
 
       try {
         const url = appNamespace 
@@ -586,15 +601,23 @@ function navisApp() {
           : `/api/v1/apps/${appName}`;
 
         const res = await fetch(url, { method: 'DELETE' });
-        const data = await res.json();
+
+        // Suporta 204 No Content sem estourar SyntaxError
+        let data = {};
+        const text = await res.text();
+        if (text) {
+          try { data = JSON.parse(text); } catch (_) { data = { message: text }; }
+        }
+
         if (!res.ok) {
           this.showNotification('Delete failed: ' + (data.detail || data.error || res.statusText), 'error');
           return;
         }
 
         this.showNotification(`Application '${appName}' deleted successfully!`, 'success');
-        this.fetchApps();
+        await this.fetchApps();
       } catch (err) {
+        console.error('Error deleting application:', err);
         this.showNotification('Error deleting application: ' + err.message, 'error');
       }
     },
