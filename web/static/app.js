@@ -436,9 +436,13 @@ async function handleInstallOffer(offerId) {
   if (!confirm(`Install '${offerId}' cluster components onto ${provider}?`)) return;
 
   try {
-    const res = await fetch(`/api/v1/offers/${offerId}/install`, { method: 'POST' });
+    const res = await fetch(`/api/v1/offers/${offerId}/install`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({})
+    });
     const data = await res.json();
-    alert(data.message || 'Installed successfully');
+    alert(data.message || (data.detail ? 'Error: ' + data.detail : 'Installed successfully'));
     fetchOffers();
   } catch (err) {
     alert('Installation failed: ' + err.message);

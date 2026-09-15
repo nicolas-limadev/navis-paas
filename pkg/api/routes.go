@@ -326,10 +326,10 @@ func SetupRouter(h *Handler, staticDir string) http.Handler {
 	// POST /api/v1/offers/{id}/install
 	type InstallOfferInput struct {
 		ID   string `path:"id"`
-		Body struct {
-			Prometheus bool `json:"prometheus"`
-			Grafana    bool `json:"grafana"`
-			OTEL       bool `json:"otel"`
+		Body *struct {
+			Prometheus *bool `json:"prometheus,omitempty" doc:"Optional Prometheus flag"`
+			Grafana    *bool `json:"grafana,omitempty" doc:"Optional Grafana flag"`
+			OTEL       *bool `json:"otel,omitempty" doc:"Optional OpenTelemetry flag"`
 		}
 	}
 	huma.Register(api, huma.Operation{
@@ -342,13 +342,20 @@ func SetupRouter(h *Handler, staticDir string) http.Handler {
 			Message string `json:"message"`
 		}
 	}, error) {
-		// Default prometheus and grafana to true if body is uninitialized
-		prom := input.Body.Prometheus
-		graf := input.Body.Grafana
-		otel := input.Body.OTEL
-		if !prom && !graf && !otel {
-			prom = true
-			graf = true
+		prom := true
+		graf := true
+		otel := false
+
+		if input.Body != nil {
+			if input.Body.Prometheus != nil {
+				prom = *input.Body.Prometheus
+			}
+			if input.Body.Grafana != nil {
+				graf = *input.Body.Grafana
+			}
+			if input.Body.OTEL != nil {
+				otel = *input.Body.OTEL
+			}
 		}
 
 		if err := h.offers.InstallOffer(ctx, input.ID, prom, graf, otel); err != nil {
